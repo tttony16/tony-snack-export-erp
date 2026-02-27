@@ -1,12 +1,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_permission, require_super_admin
+from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.database import get_db
 from app.models.user import User
+from app.repositories.warehouse_repo import InventoryRepository
 from app.schemas.common import ApiResponse, PaginatedResponse
 from app.schemas.warehouse import (
     InventoryByOrderRead,
@@ -20,8 +22,15 @@ from app.schemas.warehouse import (
     ReceivingNoteUpdate,
 )
 from app.services.warehouse_service import WarehouseService
+from app.utils.excel import create_workbook
 
 router = APIRouter(prefix="/warehouse", tags=["仓储管理"])
+
+INVENTORY_EXPORT_HEADERS = [
+    "商品ID",
+    "总数量",
+    "可用数量",
+]
 
 
 # ==================== Receiving Notes ====================
@@ -139,8 +148,26 @@ async def check_readiness(
     return ApiResponse(data=data)
 
 
-@router.get("/inventory/export", response_model=ApiResponse)
+@router.get("/inventory/export")
 async def export_inventory(
-    user: User = Depends(require_super_admin),
+    user: User = Depends(require_permission(Permission.INVENTORY_VIEW)),
+    db: AsyncSession = Depends(get_db),
 ):
-    return ApiResponse(code=501, message="功能开发中")
+    repo = InventoryRepository(db)
+    items_raw, _ = await repo.get_by_product(offset=0, limit=100000)
+    items = [InventoryByProductRead(**r) for r in items_raw]
+    rows = []
+    for item in items:
+        rows.append(
+            [
+                str(item.product_id),
+                item.total_quantity,
+                item.available_quantity,
+            ]
+        )
+    output = create_workbook("库存列表", INVENTORY_EXPORT_HEADERS, rows)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=inventory.xlsx"},
+    )

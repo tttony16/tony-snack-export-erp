@@ -16,7 +16,9 @@ from app.schemas.purchase_order import (
     PurchaseOrderRead,
     PurchaseOrderUpdate,
 )
+from app.schemas.warehouse import ReceivingNoteListParams, ReceivingNoteListRead
 from app.services.purchase_order_service import PurchaseOrderService
+from app.services.warehouse_service import WarehouseService
 
 router = APIRouter(prefix="/purchase-orders", tags=["采购单"])
 
@@ -123,12 +125,30 @@ async def link_sales_orders(
     return ApiResponse(data=read)
 
 
-@router.get("/{id}/receiving-notes", response_model=ApiResponse)
+@router.get("/{id}/receiving-notes", response_model=PaginatedResponse[ReceivingNoteListRead])
 async def get_receiving_notes(
     id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort_by: str = "created_at",
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     user: User = Depends(require_permission(Permission.PURCHASE_ORDER_VIEW)),
+    db: AsyncSession = Depends(get_db),
 ):
-    return ApiResponse(code=501, message="功能开发中")
+    # Verify PO exists
+    po_service = PurchaseOrderService(db)
+    await po_service.get_by_id(id)
+
+    wh_service = WarehouseService(db)
+    params = ReceivingNoteListParams(
+        purchase_order_id=id,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    data = await wh_service.list_receiving_notes(params)
+    return PaginatedResponse(data=data)
 
 
 def _build_po_read(order) -> PurchaseOrderRead:
@@ -140,6 +160,5 @@ def _build_po_read(order) -> PurchaseOrderRead:
     elif isinstance(sos, list):
         data.linked_sales_order_ids = [so.id for so in sos]
     else:
-        # Single object (shouldn't happen with proper typing, but be safe)
         data.linked_sales_order_ids = [sos.id]
     return data

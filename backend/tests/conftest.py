@@ -87,6 +87,19 @@ _ENUM_DEFS = [
         "logistics_cost_type",
         ["ocean_freight", "customs_fee", "port_charge", "trucking_fee", "insurance_fee", "other"],
     ),
+    (
+        "audit_action",
+        [
+            "create",
+            "update",
+            "delete",
+            "export",
+            "status_change",
+            "login",
+            "logout",
+            "permission_change",
+        ],
+    ),
 ]
 
 _db_initialized = False

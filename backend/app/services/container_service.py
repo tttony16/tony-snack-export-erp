@@ -158,6 +158,29 @@ class ContainerService:
                 message=f"柜序号 {data.container_seq} 超过柜数量 {plan.container_count}",
             )
 
+        # R05: Check inventory availability
+        available = await self.inventory_repo.get_available_quantity(
+            data.product_id, data.sales_order_id
+        )
+        # Subtract already allocated to other container items for this product+SO
+        existing_items = await self.repo.get_items_by_plan(plan_id)
+        already_allocated = sum(
+            item.quantity
+            for item in existing_items
+            if item.product_id == data.product_id and item.sales_order_id == data.sales_order_id
+        )
+        actual_available = available - already_allocated
+        if data.quantity > actual_available:
+            raise BusinessError(
+                code=42260,
+                message=f"库存不足：可用 {actual_available}，请求 {data.quantity}",
+                detail={
+                    "product_id": str(data.product_id),
+                    "available": actual_available,
+                    "requested": data.quantity,
+                },
+            )
+
         item = ContainerPlanItem(
             container_plan_id=plan_id,
             container_seq=data.container_seq,
@@ -244,6 +267,10 @@ class ContainerService:
 
     async def validate(self, plan_id: uuid.UUID) -> ContainerValidationResponse:
         """R06-R09: Validate the loading plan."""
+        from app.models.product import Product
+        from app.models.warehouse import InventoryRecord
+        from app.repositories.system_config_repo import SystemConfigRepository
+
         plan = await self.get_by_id(plan_id)
         spec = CONTAINER_SPECS[plan.container_type.value]
         items = await self.repo.get_items_by_plan(plan_id)
@@ -281,6 +308,46 @@ class ContainerService:
                         "message": f"柜{seq} 重量 {data['weight']} KG 超过限制 {spec['max_weight_kg']} KG",
                     }
                 )
+
+        # R09: Shelf life warning check
+        config_repo = SystemConfigRepository(self.db)
+        config = await config_repo.get_by_key("shelf_life_threshold")
+        threshold = float(config.config_value) if config else 0.667
+
+        today = date.today()
+        for item in items:
+            # Get product shelf_life_days
+            product_result = await self.db.execute(
+                select(Product).where(Product.id == item.product_id)
+            )
+            product = product_result.scalar_one_or_none()
+            if not product or not product.shelf_life_days:
+                continue
+
+            # Check inventory records for this product+sales_order
+            inv_result = await self.db.execute(
+                select(InventoryRecord).where(
+                    InventoryRecord.product_id == item.product_id,
+                    InventoryRecord.sales_order_id == item.sales_order_id,
+                    InventoryRecord.available_quantity > 0,
+                )
+            )
+            for inv in inv_result.scalars().all():
+                elapsed = (today - inv.production_date).days
+                remaining = product.shelf_life_days - elapsed
+                ratio = remaining / product.shelf_life_days if product.shelf_life_days > 0 else 0
+                if ratio < threshold:
+                    warnings.append(
+                        {
+                            "code": 42253,
+                            "product_id": str(item.product_id),
+                            "batch_no": inv.batch_no,
+                            "remaining_days": max(remaining, 0),
+                            "remaining_ratio": round(ratio, 4),
+                            "message": f"商品 {product.name_cn} 批次 {inv.batch_no} 保质期剩余 {max(remaining, 0)} 天 ({round(ratio * 100, 1)}%)，低于阈值 {round(threshold * 100, 1)}%",
+                        }
+                    )
+                    break  # One warning per item is enough
 
         return ContainerValidationResponse(
             is_valid=len(errors) == 0,

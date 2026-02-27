@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_permission, require_super_admin
@@ -18,8 +19,21 @@ from app.schemas.sales_order import (
     SalesOrderUpdate,
 )
 from app.services.sales_order_service import SalesOrderService
+from app.utils.excel import create_workbook
 
 router = APIRouter(prefix="/sales-orders", tags=["销售订单"])
+
+SO_EXPORT_HEADERS = [
+    "订单号",
+    "客户ID",
+    "订单日期",
+    "目的港",
+    "贸易条款",
+    "币种",
+    "状态",
+    "总金额",
+    "总数量",
+]
 
 
 @router.get("", response_model=PaginatedResponse[SalesOrderListRead])
@@ -65,11 +79,35 @@ async def create_sales_order(
     return ApiResponse(data=SalesOrderRead.model_validate(order))
 
 
-@router.get("/export", response_model=ApiResponse)
+@router.get("/export")
 async def export_sales_orders(
     user: User = Depends(require_permission(Permission.SALES_ORDER_EXPORT)),
+    db: AsyncSession = Depends(get_db),
 ):
-    return ApiResponse(code=501, message="功能开发中")
+    service = SalesOrderService(db)
+    params = SalesOrderListParams(page=1, page_size=100)
+    data = await service.list_orders(params)
+    rows = []
+    for o in data.items:
+        rows.append(
+            [
+                o.order_no,
+                str(o.customer_id),
+                str(o.order_date),
+                o.destination_port,
+                o.trade_term.value if hasattr(o.trade_term, "value") else str(o.trade_term),
+                o.currency.value if hasattr(o.currency, "value") else str(o.currency),
+                o.status.value if hasattr(o.status, "value") else str(o.status),
+                str(o.total_amount),
+                o.total_quantity,
+            ]
+        )
+    output = create_workbook("销售订单", SO_EXPORT_HEADERS, rows)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=sales_orders.xlsx"},
+    )
 
 
 @router.get("/kanban", response_model=ApiResponse[KanbanResponse])
@@ -120,16 +158,22 @@ async def confirm_sales_order(
 async def generate_purchase_order(
     id: uuid.UUID,
     user: User = Depends(require_permission(Permission.PURCHASE_ORDER_EDIT)),
+    db: AsyncSession = Depends(get_db),
 ):
-    return ApiResponse(code=501, message="功能开发中")
+    service = SalesOrderService(db)
+    result = await service.generate_purchase_orders(id, user.id)
+    return ApiResponse(data=result)
 
 
 @router.get("/{id}/fulfillment", response_model=ApiResponse)
 async def get_fulfillment(
     id: uuid.UUID,
     user: User = Depends(require_permission(Permission.SALES_ORDER_VIEW)),
+    db: AsyncSession = Depends(get_db),
 ):
-    return ApiResponse(code=501, message="功能开发中")
+    service = SalesOrderService(db)
+    data = await service.get_fulfillment(id)
+    return ApiResponse(data=data)
 
 
 @router.patch("/{id}/status", response_model=ApiResponse[SalesOrderRead])

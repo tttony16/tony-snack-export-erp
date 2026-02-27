@@ -177,6 +177,177 @@ class SalesOrderService:
             items=[KanbanItem(**s) for s in stats],
         )
 
+    async def generate_purchase_orders(self, so_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+        """Generate purchase orders from a sales order, grouped by default_supplier_id."""
+        from sqlalchemy import select
+
+        from app.models.product import Product
+        from app.services.purchase_order_service import PurchaseOrderService
+
+        order = await self.get_by_id(so_id)
+        if order.status not in (SalesOrderStatus.PURCHASING, SalesOrderStatus.DRAFT):
+            raise BusinessError(code=42213, message="只有草稿或采购中状态的订单可以生成采购单")
+
+        # Group items by supplier
+        supplier_items: dict[uuid.UUID | None, list] = {}
+        for item in order.items:
+            result = await self.db.execute(select(Product).where(Product.id == item.product_id))
+            product = result.scalar_one_or_none()
+            supplier_id = product.default_supplier_id if product else None
+            if supplier_id not in supplier_items:
+                supplier_items[supplier_id] = []
+            supplier_items[supplier_id].append((item, product))
+
+        po_service = PurchaseOrderService(self.db)
+        created_pos = []
+
+        for supplier_id, items_with_products in supplier_items.items():
+            if not supplier_id:
+                continue  # Skip items without supplier
+
+            from datetime import date
+
+            from app.schemas.purchase_order import PurchaseOrderCreate, PurchaseOrderItemCreate
+
+            po_items = []
+            for so_item, product in items_with_products:
+                remaining = so_item.quantity - so_item.purchased_quantity
+                if remaining <= 0:
+                    continue
+                po_items.append(
+                    PurchaseOrderItemCreate(
+                        product_id=so_item.product_id,
+                        sales_order_item_id=so_item.id,
+                        quantity=remaining,
+                        unit=so_item.unit,
+                        unit_price=Decimal(
+                            str(product.default_purchase_price or so_item.unit_price)
+                        ),
+                    )
+                )
+
+            if not po_items:
+                continue
+
+            po_data = PurchaseOrderCreate(
+                supplier_id=supplier_id,
+                order_date=date.today(),
+                sales_order_ids=[so_id],
+                items=po_items,
+            )
+            po = await po_service.create(po_data, user_id)
+            created_pos.append(str(po.id))
+
+        return {
+            "sales_order_id": str(so_id),
+            "created_purchase_orders": created_pos,
+            "count": len(created_pos),
+        }
+
+    async def get_fulfillment(self, so_id: uuid.UUID) -> dict:
+        """Get fulfillment chain: SO → PO → Receiving Notes → Inventory → Container → Logistics."""
+        from sqlalchemy import select
+
+        from app.models.container import (
+            ContainerPlan,
+            container_plan_sales_orders,
+        )
+        from app.models.logistics import LogisticsRecord
+        from app.models.purchase_order import PurchaseOrder, purchase_order_sales_orders
+        from app.models.warehouse import InventoryRecord, ReceivingNote
+
+        order = await self.get_by_id(so_id)
+
+        # Get linked POs
+        po_result = await self.db.execute(
+            select(PurchaseOrder)
+            .join(
+                purchase_order_sales_orders,
+                PurchaseOrder.id == purchase_order_sales_orders.c.purchase_order_id,
+            )
+            .where(purchase_order_sales_orders.c.sales_order_id == so_id)
+        )
+        pos = list(po_result.scalars().all())
+
+        # Get receiving notes for those POs
+        receiving_notes = []
+        for po in pos:
+            rn_result = await self.db.execute(
+                select(ReceivingNote).where(ReceivingNote.purchase_order_id == po.id)
+            )
+            for rn in rn_result.scalars().all():
+                receiving_notes.append(
+                    {
+                        "id": str(rn.id),
+                        "note_no": rn.note_no,
+                        "purchase_order_id": str(po.id),
+                        "receiving_date": str(rn.receiving_date),
+                    }
+                )
+
+        # Get inventory records
+        inv_result = await self.db.execute(
+            select(InventoryRecord).where(InventoryRecord.sales_order_id == so_id)
+        )
+        inventory = [
+            {
+                "product_id": str(r.product_id),
+                "batch_no": r.batch_no,
+                "quantity": r.quantity,
+                "available_quantity": r.available_quantity,
+            }
+            for r in inv_result.scalars().all()
+        ]
+
+        # Get container plans
+        cp_result = await self.db.execute(
+            select(ContainerPlan)
+            .join(
+                container_plan_sales_orders,
+                ContainerPlan.id == container_plan_sales_orders.c.container_plan_id,
+            )
+            .where(container_plan_sales_orders.c.sales_order_id == so_id)
+        )
+        containers = [
+            {
+                "id": str(cp.id),
+                "plan_no": cp.plan_no,
+                "container_type": cp.container_type.value,
+                "status": cp.status.value,
+            }
+            for cp in cp_result.scalars().all()
+        ]
+
+        # Get logistics for those containers
+        logistics = []
+        for cp_data in containers:
+            lr_result = await self.db.execute(
+                select(LogisticsRecord).where(LogisticsRecord.container_plan_id == cp_data["id"])
+            )
+            for lr in lr_result.scalars().all():
+                logistics.append(
+                    {
+                        "id": str(lr.id),
+                        "logistics_no": lr.logistics_no,
+                        "container_plan_id": cp_data["id"],
+                        "status": lr.status.value,
+                        "eta": str(lr.eta) if lr.eta else None,
+                    }
+                )
+
+        return {
+            "sales_order_id": str(so_id),
+            "order_no": order.order_no,
+            "status": order.status.value,
+            "purchase_orders": [
+                {"id": str(po.id), "order_no": po.order_no, "status": po.status.value} for po in pos
+            ],
+            "receiving_notes": receiving_notes,
+            "inventory": inventory,
+            "containers": containers,
+            "logistics": logistics,
+        }
+
     def _calculate_totals(self, order: SalesOrder) -> None:
         order.total_amount = (
             sum(item.amount for item in order.items) if order.items else Decimal("0")

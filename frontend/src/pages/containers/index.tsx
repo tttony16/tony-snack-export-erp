@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
+import { Segmented } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { listContainerPlans } from '@/api/containers';
 import { ContainerPlanStatusLabels, ContainerPlanStatusColors, ContainerTypeLabels } from '@/types/api';
@@ -9,11 +10,14 @@ import { formatDate } from '@/utils/format';
 import PermissionButton from '@/components/PermissionButton';
 import StatusTag from '@/components/StatusTag';
 import ContainerForm from './ContainerForm';
+import ContainerKanbanView from './ContainerKanbanView';
 
 export default function ContainersPage() {
   const actionRef = useRef<ActionType>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
   const columns: ProColumns<ContainerPlanListRead>[] = [
     { title: '计划号', dataIndex: 'plan_no', width: 140 },
@@ -52,34 +56,50 @@ export default function ContainersPage() {
   ];
 
   return (
-    <PageContainer>
-      <ProTable<ContainerPlanListRead>
-        actionRef={actionRef}
-        rowKey="id"
-        columns={columns}
-        request={async (params) => {
-          const { current, pageSize, keyword, ...rest } = params;
-          const data = await listContainerPlans({
-            page: current,
-            page_size: pageSize,
-            keyword,
-            ...rest,
-          });
-          return { data: data.items, total: data.total, success: true };
-        }}
-        search={{ labelWidth: 'auto' }}
-        toolBarRender={() => [
-          <PermissionButton
-            key="add"
-            type="primary"
-            icon={<PlusOutlined />}
-            permission="container:edit"
-            onClick={() => setFormOpen(true)}
-          >
-            新建排柜计划
-          </PermissionButton>,
-        ]}
-      />
+    <PageContainer
+      extra={
+        <Segmented
+          options={[
+            { label: '列表', value: 'list' },
+            { label: '看板', value: 'kanban' },
+          ]}
+          value={viewMode}
+          onChange={(v) => setViewMode(v as 'list' | 'kanban')}
+        />
+      }
+    >
+      {viewMode === 'kanban' ? (
+        <ContainerKanbanView />
+      ) : (
+        <ProTable<ContainerPlanListRead>
+          actionRef={actionRef}
+          rowKey="id"
+          columns={columns}
+          params={{ keyword: searchParams.get('keyword') || undefined }}
+          request={async (params) => {
+            const { current, pageSize, keyword, ...rest } = params;
+            const data = await listContainerPlans({
+              page: current,
+              page_size: pageSize,
+              keyword,
+              ...rest,
+            });
+            return { data: data.items, total: data.total, success: true };
+          }}
+          search={{ labelWidth: 'auto' }}
+          toolBarRender={() => [
+            <PermissionButton
+              key="add"
+              type="primary"
+              icon={<PlusOutlined />}
+              permission="container:edit"
+              onClick={() => setFormOpen(true)}
+            >
+              新建排柜计划
+            </PermissionButton>,
+          ]}
+        />
+      )}
       <ContainerForm
         open={formOpen}
         onClose={() => setFormOpen(false)}

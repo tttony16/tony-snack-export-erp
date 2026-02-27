@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Segmented } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
@@ -15,6 +15,7 @@ import LogisticsKanbanView from './LogisticsKanbanView';
 export default function LogisticsPage() {
   const actionRef = useRef<ActionType>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
 
@@ -72,6 +73,7 @@ export default function LogisticsPage() {
           actionRef={actionRef}
           rowKey="id"
           columns={columns}
+          params={{ keyword: searchParams.get('keyword') || undefined }}
           request={async (params) => {
             const { current, pageSize, keyword, ...rest } = params;
             const data = await listLogistics({

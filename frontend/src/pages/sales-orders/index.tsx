@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
-import { Segmented } from 'antd';
+import { Segmented, Progress } from 'antd';
 import { PlusOutlined, DownloadOutlined } from '@ant-design/icons';
 import { listSalesOrders } from '@/api/salesOrders';
 import { SalesOrderStatusLabels, SalesOrderStatusColors } from '@/types/api';
@@ -57,6 +57,24 @@ export default function SalesOrdersPage() {
     },
     { title: '数量', dataIndex: 'total_quantity', hideInSearch: true, width: 80 },
     {
+      title: '采购进度',
+      hideInSearch: true,
+      width: 100,
+      render: (_, r: any) =>
+        r.purchase_progress != null
+          ? <Progress percent={Math.round(r.purchase_progress * 100)} size="small" />
+          : '-',
+    },
+    {
+      title: '到货进度',
+      hideInSearch: true,
+      width: 100,
+      render: (_, r: any) =>
+        r.arrival_progress != null
+          ? <Progress percent={Math.round(r.arrival_progress * 100)} size="small" />
+          : '-',
+    },
+    {
       title: '日期范围',
       dataIndex: 'dateRange',
       hideInTable: true,
@@ -95,7 +113,7 @@ export default function SalesOrdersPage() {
           actionRef={actionRef}
           rowKey="id"
           columns={columns}
-          params={{ customer_id: searchParams.get('customer_id') || undefined }}
+          params={{ customer_id: searchParams.get('customer_id') || undefined, keyword: searchParams.get('keyword') || undefined }}
           request={async (params) => {
             const { current, pageSize, keyword, customer_id, ...rest } = params;
             const data = await listSalesOrders({

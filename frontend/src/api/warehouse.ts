@@ -6,6 +6,7 @@ import type {
   ReceivingNoteCreate,
   ReceivingNoteUpdate,
   ReceivingNoteListParams,
+  ReceivingNoteItemRead,
   InventoryByProductRead,
   InventoryByOrderRead,
   InventoryListParams,
@@ -40,4 +41,9 @@ export async function getInventoryByOrder(salesOrderId: string): Promise<Invento
 
 export async function checkReadiness(salesOrderId: string): Promise<ReadinessCheckResponse> {
   return request.get(`/warehouse/inventory/readiness/${salesOrderId}`);
+}
+
+// Pending Inspection
+export async function listPendingInspection(params: InventoryListParams): Promise<PaginatedData<ReceivingNoteItemRead>> {
+  return request.get('/warehouse/inventory/pending-inspection', { params });
 }

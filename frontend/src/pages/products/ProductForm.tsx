@@ -1,8 +1,10 @@
-import { ModalForm, ProFormText, ProFormDigit, ProFormSelect, ProFormTextArea } from '@ant-design/pro-components';
-import { message } from 'antd';
+import { ModalForm, ProFormText, ProFormDigit, ProFormSelect, ProFormTextArea, ProFormDependency } from '@ant-design/pro-components';
+import { message, Image, Form } from 'antd';
 import { createProduct, updateProduct } from '@/api/products';
+import { listSuppliers } from '@/api/suppliers';
 import { ProductCategoryLabels } from '@/types/api';
 import type { ProductRead } from '@/types/models';
+import EntitySelect from '@/components/EntitySelect';
 
 interface Props {
   open: boolean;
@@ -61,8 +63,31 @@ export default function ProductForm({ open, onClose, onSuccess, record }: Props)
       <ProFormDigit name="carton_gross_weight_kg" label="箱毛重(kg)" rules={[{ required: true }]} min={0.001} />
       <ProFormDigit name="shelf_life_days" label="保质期(天)" rules={[{ required: true }]} min={1} fieldProps={{ precision: 0 }} />
       <ProFormDigit name="default_purchase_price" label="默认采购价" min={0} fieldProps={{ precision: 2 }} />
+      <Form.Item name="default_supplier_id" label="默认供应商">
+        <EntitySelect
+          fetchFn={listSuppliers}
+          labelField="name"
+          placeholder="请选择供应商"
+          allowClear
+        />
+      </Form.Item>
       <ProFormText name="hs_code" label="HS编码" />
       <ProFormText name="image_url" label="图片URL" />
+      <ProFormDependency name={['image_url']}>
+        {({ image_url }) =>
+          image_url ? (
+            <div style={{ marginBottom: 24, paddingLeft: 12 }}>
+              <Image
+                src={image_url}
+                width={80}
+                height={80}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8/+F/PQAJpAN1sFOxEwAAAABJRU5ErkJggg=="
+              />
+            </div>
+          ) : null
+        }
+      </ProFormDependency>
       <ProFormTextArea name="remark" label="备注" colProps={{ span: 24 }} />
     </ModalForm>
   );

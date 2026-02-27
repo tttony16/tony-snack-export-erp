@@ -64,7 +64,7 @@ export default function PurchaseOrdersPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
-        params={{ supplier_id: searchParams.get('supplier_id') || undefined }}
+        params={{ supplier_id: searchParams.get('supplier_id') || undefined, keyword: searchParams.get('keyword') || undefined }}
         request={async (params) => {
           const { current, pageSize, keyword, supplier_id, ...rest } = params;
           const data = await listPurchaseOrders({

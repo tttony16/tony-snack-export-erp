@@ -8,3 +8,23 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@media (max-width: 768px) {
+  /* ProTable 搜索栏紧凑 */
+  .ant-pro-table-search { padding: 12px !important; }
+  /* PageContainer 内边距缩小 */
+  .ant-pro-page-container .ant-pro-page-container-children-content { padding: 12px !important; }
+  /* 触控友好按钮 */
+  .ant-btn { min-height: 36px; }
+  /* 卡片紧凑 */
+  .ant-card-body { padding: 12px !important; }
+  /* Modal 全宽 */
+  .ant-modal { max-width: calc(100vw - 32px) !important; margin: 16px auto !important; }
+}
+
+@media (max-width: 576px) {
+  /* 小屏标题缩小 */
+  .ant-pro-page-container .ant-page-header-heading-title { font-size: 16px !important; }
+  /* action 按钮换行 */
+  .ant-pro-page-container .ant-page-header-heading-extra { display: flex; flex-wrap: wrap; gap: 8px; }
+}

@@ -18,6 +18,7 @@ import { Dropdown, type MenuProps } from 'antd';
 import { useAuthStore } from '@/store/useAuthStore';
 import { logout as logoutApi } from '@/api/auth';
 import { usePermission } from '@/hooks/usePermission';
+import GlobalSearch from '@/components/GlobalSearch';
 
 const allMenus: (MenuDataItem & { permission?: string })[] = [
   { path: '/dashboard', name: '工作台', icon: <DashboardOutlined /> },
@@ -91,6 +92,7 @@ export default function BasicLayout() {
         <a onClick={() => item.path && navigate(item.path)}>{dom}</a>
       )}
       actionsRender={() => [
+        <GlobalSearch key="search" />,
         <Dropdown
           key="user"
           menu={{

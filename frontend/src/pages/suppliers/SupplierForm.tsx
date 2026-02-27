@@ -1,5 +1,6 @@
 import { ModalForm, ProFormText, ProFormTextArea, ProFormSelect } from '@ant-design/pro-components';
-import { message } from 'antd';
+import { message, Form, Input, Button, Space } from 'antd';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { createSupplier, updateSupplier } from '@/api/suppliers';
 import { ProductCategoryLabels } from '@/types/api';
 import type { SupplierRead } from '@/types/models';
@@ -53,6 +54,25 @@ export default function SupplierForm({ open, onClose, onSuccess, record }: Props
       />
       <ProFormText name="business_license" label="营业执照号" />
       <ProFormText name="food_production_license" label="食品生产许可证" />
+      <Form.Item label="证书附件链接" style={{ gridColumn: 'span 2' }}>
+        <Form.List name="certificate_urls">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map((field) => (
+                <Space key={field.key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+                  <Form.Item {...field} noStyle>
+                    <Input placeholder="https://example.com/cert.pdf" style={{ width: 500 }} />
+                  </Form.Item>
+                  <MinusCircleOutlined onClick={() => remove(field.name)} style={{ color: '#ff4d4f' }} />
+                </Space>
+              ))}
+              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} style={{ width: 200 }}>
+                添加证书链接
+              </Button>
+            </>
+          )}
+        </Form.List>
+      </Form.Item>
       <ProFormTextArea name="address" label="地址" colProps={{ span: 24 }} />
       <ProFormTextArea name="remark" label="备注" colProps={{ span: 24 }} />
     </ModalForm>

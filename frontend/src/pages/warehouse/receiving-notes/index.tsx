@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { PlusOutlined } from '@ant-design/icons';
 import { listReceivingNotes } from '@/api/warehouse';
@@ -9,6 +10,7 @@ import ReceivingNoteForm from './ReceivingNoteForm';
 
 export default function ReceivingNotesPage() {
   const actionRef = useRef<ActionType>();
+  const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
 
   const columns: ProColumns<ReceivingNoteListRead>[] = [
@@ -37,6 +39,7 @@ export default function ReceivingNotesPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        params={{ keyword: searchParams.get('keyword') || undefined }}
         request={async (params) => {
           const { current, pageSize, keyword, ...rest } = params;
           const data = await listReceivingNotes({

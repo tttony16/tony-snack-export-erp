@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageContainer } from '@ant-design/pro-components';
-import { Descriptions, Table, Card, Space, Button, Row, Col, message, Spin, Alert } from 'antd';
+import { Descriptions, Table, Card, Space, Button, Row, Col, message, Spin, Alert, Image, Modal, Input } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import {
   getContainerPlan,
   getContainerSummary,
   recommendContainerType,
   validateContainer,
   confirmContainerPlan,
+  uploadStuffingPhoto,
 } from '@/api/containers';
 import {
   ContainerPlanStatusLabels,
@@ -16,6 +18,7 @@ import {
 } from '@/types/api';
 import type { ContainerPlanRead, ContainerSummaryItem } from '@/types/models';
 import { formatDate, formatDateTime, formatDecimal } from '@/utils/format';
+import { downloadFile } from '@/utils/download';
 import StatusTag from '@/components/StatusTag';
 import PermissionButton from '@/components/PermissionButton';
 import ContainerSummaryCard from './ContainerSummaryCard';
@@ -27,6 +30,10 @@ export default function ContainerDetailPage() {
   const [summaryItems, setSummaryItems] = useState<ContainerSummaryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [photoRecordId, setPhotoRecordId] = useState<string>('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoDesc, setPhotoDesc] = useState('');
 
   const load = async () => {
     if (!id) return;
@@ -74,6 +81,24 @@ export default function ContainerDetailPage() {
     });
   };
 
+  const handleExportPackingList = async () => {
+    await downloadFile(`/containers/${plan.id}/packing-list`, `装箱单_${plan.plan_no}.xlsx`);
+    message.success('导出成功');
+  };
+
+  const handleAddPhoto = async () => {
+    if (!photoUrl) {
+      message.warning('请输入照片URL');
+      return;
+    }
+    await uploadStuffingPhoto(photoRecordId, { photo_url: photoUrl, description: photoDesc || undefined });
+    message.success('照片添加成功');
+    setPhotoModalOpen(false);
+    setPhotoUrl('');
+    setPhotoDesc('');
+    load();
+  };
+
   return (
     <PageContainer
       title={`排柜计划 ${plan.plan_no}`}
@@ -87,6 +112,15 @@ export default function ContainerDetailPage() {
                 确认
               </PermissionButton>
             </>
+          )}
+          {plan.status !== 'planning' && (
+            <PermissionButton
+              permission="packing_list:export"
+              icon={<DownloadOutlined />}
+              onClick={handleExportPackingList}
+            >
+              导出装箱单
+            </PermissionButton>
           )}
           <Button onClick={() => navigate('/containers')}>返回列表</Button>
         </Space>
@@ -156,12 +190,72 @@ export default function ContainerDetailPage() {
               {
                 title: '照片',
                 dataIndex: 'photos',
-                render: (_, record) => `${record.photos?.length || 0} 张`,
+                width: 200,
+                render: (_, record) =>
+                  record.photos?.length > 0 ? (
+                    <Image.PreviewGroup>
+                      <Space>
+                        {record.photos.map((p) => (
+                          <Image
+                            key={p.id}
+                            src={p.photo_url}
+                            width={40}
+                            height={40}
+                            style={{ objectFit: 'cover', borderRadius: 4 }}
+                          />
+                        ))}
+                      </Space>
+                    </Image.PreviewGroup>
+                  ) : (
+                    '0 张'
+                  ),
+              },
+              {
+                title: '操作',
+                width: 100,
+                render: (_, record) => (
+                  <Button
+                    type="link"
+                    size="small"
+                    onClick={() => {
+                      setPhotoRecordId(record.id);
+                      setPhotoModalOpen(true);
+                    }}
+                  >
+                    添加照片
+                  </Button>
+                ),
               },
             ]}
           />
         </Card>
       )}
+
+      <Modal
+        title="添加装柜照片"
+        open={photoModalOpen}
+        onOk={handleAddPhoto}
+        onCancel={() => { setPhotoModalOpen(false); setPhotoUrl(''); setPhotoDesc(''); }}
+        okText="确定"
+        cancelText="取消"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', marginBottom: 4 }}>照片URL *</label>
+          <Input
+            value={photoUrl}
+            onChange={(e) => setPhotoUrl(e.target.value)}
+            placeholder="https://example.com/photo.jpg"
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: 4 }}>描述</label>
+          <Input
+            value={photoDesc}
+            onChange={(e) => setPhotoDesc(e.target.value)}
+            placeholder="照片描述（可选）"
+          />
+        </div>
+      </Modal>
     </PageContainer>
   );
 }

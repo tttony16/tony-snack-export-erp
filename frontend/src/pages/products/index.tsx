@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Button, Switch, message } from 'antd';
 import { PlusOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
@@ -13,6 +14,7 @@ import ProductForm from './ProductForm';
 
 export default function ProductsPage() {
   const actionRef = useRef<ActionType>();
+  const [searchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<ProductRead | undefined>();
   const { exporting, handleExport } = useExport('/products/export', '商品列表.xlsx');
@@ -78,6 +80,7 @@ export default function ProductsPage() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        params={{ keyword: searchParams.get('keyword') || undefined }}
         request={async (params) => {
           const { current, pageSize, keyword, ...rest } = params;
           const data = await listProducts({

@@ -1,0 +1,150 @@
+import {
+  ModalForm,
+  ProFormSelect,
+  ProFormDatePicker,
+  ProFormTextArea,
+  EditableProTable,
+} from '@ant-design/pro-components';
+import type { ProColumns } from '@ant-design/pro-components';
+import { message } from 'antd';
+import { createPurchaseOrder, updatePurchaseOrder } from '@/api/purchaseOrders';
+import { listSuppliers } from '@/api/suppliers';
+import { listSalesOrders } from '@/api/salesOrders';
+import { UnitTypeLabels } from '@/types/api';
+import type { PurchaseOrderRead, PurchaseOrderItemCreate } from '@/types/models';
+import EntitySelect from '@/components/EntitySelect';
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  record?: PurchaseOrderRead;
+}
+
+type EditableItem = PurchaseOrderItemCreate & { id?: string };
+
+export default function PurchaseOrderForm({ open, onClose, onSuccess, record }: Props) {
+  const isEdit = !!record;
+
+  const itemColumns: ProColumns<EditableItem>[] = [
+    {
+      title: '商品',
+      dataIndex: 'product_id',
+      renderFormItem: () => (
+        <EntitySelect
+          fetchFn={async (params) => {
+            const { default: request } = await import('@/utils/request');
+            return request.get('/products', { params });
+          }}
+          labelField="name_cn"
+          placeholder="搜索商品"
+        />
+      ),
+    },
+    { title: '数量', dataIndex: 'quantity', valueType: 'digit', width: 100 },
+    {
+      title: '单位',
+      dataIndex: 'unit',
+      valueType: 'select',
+      width: 80,
+      fieldProps: { options: Object.entries(UnitTypeLabels).map(([v, l]) => ({ value: v, label: l })) },
+    },
+    { title: '单价', dataIndex: 'unit_price', valueType: 'money', width: 120 },
+    {
+      title: '金额',
+      editable: false,
+      width: 120,
+      render: (_, row) => ((row.quantity || 0) * (row.unit_price || 0)).toFixed(2),
+    },
+    { title: '操作', valueType: 'option', width: 60 },
+  ];
+
+  return (
+    <ModalForm
+      title={isEdit ? '编辑采购订单' : '新建采购订单'}
+      open={open}
+      modalProps={{ onCancel: onClose, destroyOnClose: true }}
+      initialValues={
+        isEdit
+          ? { ...record, items: record.items.map((i) => ({ ...i, id: i.id })) }
+          : { items: [] }
+      }
+      width={900}
+      grid
+      colProps={{ span: 8 }}
+      onFinish={async (values: Record<string, unknown>) => {
+        const items = (values.items as EditableItem[]) || [];
+        if (items.length === 0) {
+          message.warning('请添加至少一个明细行');
+          return false;
+        }
+        const payload = {
+          ...values,
+          items: items.map(({ product_id, quantity, unit, unit_price, sales_order_item_id }) => ({
+            product_id,
+            quantity,
+            unit,
+            unit_price,
+            sales_order_item_id,
+          })),
+        };
+        if (isEdit) {
+          await updatePurchaseOrder(record!.id, payload as never);
+          message.success('更新成功');
+        } else {
+          await createPurchaseOrder(payload as never);
+          message.success('创建成功');
+        }
+        onSuccess();
+        return true;
+      }}
+    >
+      <ProFormSelect
+        name="supplier_id"
+        label="供应商"
+        rules={[{ required: true }]}
+        showSearch
+        request={async ({ keyWords }) => {
+          const data = await listSuppliers({ keyword: keyWords, page_size: 50 });
+          return data.items.map((s) => ({ value: s.id, label: s.name }));
+        }}
+      />
+      <ProFormDatePicker name="order_date" label="订单日期" rules={[{ required: true }]} />
+      <ProFormDatePicker name="required_date" label="要求交期" />
+      <ProFormSelect
+        name="sales_order_ids"
+        label="关联销售单"
+        mode="multiple"
+        showSearch
+        request={async ({ keyWords }) => {
+          const data = await listSalesOrders({ keyword: keyWords, page_size: 50 });
+          return data.items.map((s) => ({ value: s.id, label: s.order_no }));
+        }}
+        colProps={{ span: 16 }}
+      />
+      <ProFormTextArea name="remark" label="备注" colProps={{ span: 24 }} />
+
+      <EditableProTable<EditableItem>
+        name="items"
+        headerTitle="采购明细"
+        columns={itemColumns}
+        rowKey="id"
+        recordCreatorProps={{
+          newRecordType: 'dataSource',
+          record: () => ({
+            id: String(Date.now()),
+            product_id: '',
+            quantity: 1,
+            unit: 'carton' as const,
+            unit_price: 0,
+          }),
+        }}
+        editable={{
+          type: 'multiple',
+          editableKeys: [],
+          actionRender: (_row, _config, defaultDom) => [defaultDom.save, defaultDom.delete],
+        }}
+      />
+    </ModalForm>
+  );
+}

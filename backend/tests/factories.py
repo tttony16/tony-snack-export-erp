@@ -4,7 +4,9 @@ import uuid
 from datetime import date
 
 from app.models.enums import (
+    ContainerType,
     CurrencyType,
+    InspectionResult,
     PaymentMethod,
     ProductCategory,
     TradeTerm,
@@ -89,6 +91,59 @@ def make_purchase_order_data(supplier_id: str, product_id: str, **overrides) -> 
             }
         ],
         "sales_order_ids": [],
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_receiving_note_data(
+    purchase_order_id: str,
+    po_item_id: str,
+    product_id: str,
+    **overrides,
+) -> dict:
+    defaults = {
+        "purchase_order_id": purchase_order_id,
+        "receiving_date": date.today().isoformat(),
+        "receiver": "Test Warehouse Worker",
+        "items": [
+            {
+                "purchase_order_item_id": po_item_id,
+                "product_id": product_id,
+                "expected_quantity": 50,
+                "actual_quantity": 50,
+                "inspection_result": InspectionResult.PASSED.value,
+                "failed_quantity": 0,
+                "production_date": date.today().isoformat(),
+            }
+        ],
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_container_plan_data(
+    sales_order_ids: list[str],
+    **overrides,
+) -> dict:
+    defaults = {
+        "sales_order_ids": sales_order_ids,
+        "container_type": ContainerType.HQ40.value,
+        "container_count": 1,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_logistics_record_data(
+    container_plan_id: str,
+    **overrides,
+) -> dict:
+    defaults = {
+        "container_plan_id": container_plan_id,
+        "port_of_loading": "Shanghai Port",
+        "shipping_company": "COSCO",
+        "vessel_voyage": "STAR VOYAGER V.123",
     }
     defaults.update(overrides)
     return defaults

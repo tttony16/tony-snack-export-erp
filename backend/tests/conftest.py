@@ -68,6 +68,25 @@ _ENUM_DEFS = [
         ["draft", "ordered", "partial_received", "fully_received", "completed", "cancelled"],
     ),
     ("unit_type", ["piece", "carton"]),
+    ("inspection_result", ["passed", "failed", "partial_passed"]),
+    ("container_plan_status", ["planning", "confirmed", "loading", "loaded", "shipped"]),
+    ("container_type", ["20GP", "40GP", "40HQ", "reefer"]),
+    (
+        "logistics_status",
+        [
+            "booked",
+            "customs_cleared",
+            "loaded_on_ship",
+            "in_transit",
+            "arrived",
+            "picked_up",
+            "delivered",
+        ],
+    ),
+    (
+        "logistics_cost_type",
+        ["ocean_freight", "customs_fee", "port_charge", "trucking_fee", "insurance_fee", "other"],
+    ),
 ]
 
 _db_initialized = False
@@ -198,6 +217,23 @@ async def purchaser_user(db_session: AsyncSession) -> User:
         display_name="Test Purchaser",
         email=f"purchaser_{uuid.uuid4().hex[:8]}@test.com",
         role=UserRole.PURCHASER,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def warehouse_user(db_session: AsyncSession) -> User:
+    """Create a warehouse user for testing."""
+    user = User(
+        username=f"warehouse_{uuid.uuid4().hex[:8]}",
+        password_hash=hash_password("testpass123"),
+        display_name="Test Warehouse",
+        email=f"warehouse_{uuid.uuid4().hex[:8]}@test.com",
+        role=UserRole.WAREHOUSE,
         is_active=True,
     )
     db_session.add(user)

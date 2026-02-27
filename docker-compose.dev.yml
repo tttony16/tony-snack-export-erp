@@ -1,0 +1,17 @@
+version: "3.8"
+
+# 开发环境覆盖：仅启动 postgres + redis
+# 用法: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  backend:
+    profiles:
+      - full    # 开发时不启动，用 uv run uvicorn 代替
+
+  frontend:
+    profiles:
+      - full    # 开发时不启动
+
+  nginx:
+    profiles:
+      - full    # 开发时不启动

@@ -48,6 +48,26 @@ _ENUM_DEFS = [
     ),
     ("payment_method", ["TT", "LC", "DP", "DA"]),
     ("trade_term", ["FOB", "CIF", "CFR", "EXW", "DDP", "DAP"]),
+    (
+        "sales_order_status",
+        [
+            "draft",
+            "confirmed",
+            "purchasing",
+            "goods_ready",
+            "container_planned",
+            "container_loaded",
+            "shipped",
+            "delivered",
+            "completed",
+            "abnormal",
+        ],
+    ),
+    (
+        "purchase_order_status",
+        ["draft", "ordered", "partial_received", "fully_received", "completed", "cancelled"],
+    ),
+    ("unit_type", ["piece", "carton"]),
 ]
 
 _db_initialized = False
@@ -144,6 +164,40 @@ async def viewer_user(db_session: AsyncSession) -> User:
         display_name="Test Viewer",
         email=f"viewer_{uuid.uuid4().hex[:8]}@test.com",
         role=UserRole.VIEWER,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def sales_user(db_session: AsyncSession) -> User:
+    """Create a sales user for testing."""
+    user = User(
+        username=f"sales_{uuid.uuid4().hex[:8]}",
+        password_hash=hash_password("testpass123"),
+        display_name="Test Sales",
+        email=f"sales_{uuid.uuid4().hex[:8]}@test.com",
+        role=UserRole.SALES,
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.flush()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def purchaser_user(db_session: AsyncSession) -> User:
+    """Create a purchaser user for testing."""
+    user = User(
+        username=f"purchaser_{uuid.uuid4().hex[:8]}",
+        password_hash=hash_password("testpass123"),
+        display_name="Test Purchaser",
+        email=f"purchaser_{uuid.uuid4().hex[:8]}@test.com",
+        role=UserRole.PURCHASER,
         is_active=True,
     )
     db_session.add(user)

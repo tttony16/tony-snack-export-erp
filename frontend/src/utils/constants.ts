@@ -1,6 +1,5 @@
 // Re-export all enum labels and color maps for convenient access
 export {
-  ProductCategoryLabels,
   ProductStatusLabels,
   SalesOrderStatusLabels,
   SalesOrderStatusColors,

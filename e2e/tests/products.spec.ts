@@ -3,7 +3,7 @@ import { makeProduct } from '../fixtures/test-data';
 import {
   fillProFormField,
   fillProFormDigit,
-  selectAntOption,
+  selectCascaderOption,
   waitForTableLoaded,
   waitForModalClosed,
   waitForMessage,
@@ -13,12 +13,24 @@ import {
 
 test.describe('Products Module', () => {
   let apiProductName: string;
+  let categoryNames: string[]; // [level1, level2, level3] names for Cascader
 
   test.beforeAll(async ({ browser }) => {
-    // Create a product via API for edit/search tests
+    // Create a category chain and a product via API for edit/search tests
     const { ApiClient } = await import('../fixtures/api-client');
     const api = await ApiClient.create('admin', 'admin123');
-    const data = makeProduct();
+
+    // Ensure a 3-level category chain exists (under 饼干)
+    const { categoryId, level1Id } = await api.ensureCategoryChain('饼干');
+
+    // Fetch tree to get the names for UI interaction
+    const tree = await api.getCategoryTree();
+    const level1 = tree.find((n: any) => n.id === level1Id);
+    const level2 = level1?.children?.[0];
+    const level3 = level2?.children?.[0];
+    categoryNames = [level1?.name || '饼干', level2?.name || 'E2E二级品类', level3?.name || 'E2E三级品类'];
+
+    const data = makeProduct({ category_id: categoryId });
     apiProductName = data.name_cn;
     await api.createProduct(data);
     await api.dispose();
@@ -35,7 +47,7 @@ test.describe('Products Module', () => {
     await fillProFormField(adminPage, 'SKU 编码', product.sku_code);
     await fillProFormField(adminPage, '中文名称', product.name_cn);
     await fillProFormField(adminPage, '英文名称', product.name_en);
-    await selectAntOption(adminPage, '分类', '饼干');
+    await selectCascaderOption(adminPage, '分类', categoryNames);
     await fillProFormField(adminPage, '规格', product.spec);
     await fillProFormField(adminPage, '装箱规格', product.packing_spec);
     await fillProFormDigit(adminPage, '单位重量(kg)', String(product.unit_weight_kg));
@@ -79,7 +91,6 @@ test.describe('Products Module', () => {
     await waitForTableLoaded(adminPage);
 
     // Find any switch in the first row and toggle it
-    // (searching by product name may not filter due to API limitations)
     const firstRow = adminPage.locator('.ant-table-row').first();
     const switchBtn = firstRow.locator('.ant-switch').first();
     await switchBtn.waitFor({ state: 'visible', timeout: 5000 });
@@ -95,7 +106,7 @@ test.describe('Products Module', () => {
     await adminPage.goto('/products');
     await waitForTableLoaded(adminPage);
 
-    // Search by generic keyword in the first input field (may be SKU or keyword)
+    // Search by generic keyword in the first input field
     await fillTableSearch(adminPage, 'E2E');
 
     // Table should still be visible after search
@@ -106,14 +117,19 @@ test.describe('Products Module', () => {
     await adminPage.goto('/products');
     await waitForTableLoaded(adminPage);
 
-    // Expand search area if collapsed, then use the category select
+    // Expand search area if collapsed, then use the category cascader
     await expandTableSearch(adminPage);
     const searchArea = adminPage.locator('.ant-pro-table-search');
     const categoryItem = searchArea.locator('.ant-form-item', { hasText: '分类' }).first();
-    const categorySelect = categoryItem.locator('.ant-select').first();
-    await categorySelect.click();
+    const cascader = categoryItem.locator('.ant-cascader').first();
+    await cascader.click();
     await adminPage.waitForTimeout(500);
-    await adminPage.locator('.ant-select-dropdown:visible').locator('.ant-select-item-option').filter({ hasText: '饼干' }).first().click();
+    // Select a level-1 category (allowAnyLevel mode)
+    const menuCol = adminPage.locator('.ant-cascader-dropdown:visible .ant-cascader-menu').first();
+    await menuCol.locator('.ant-cascader-menu-item').filter({ hasText: '饼干' }).first().click();
+    await adminPage.waitForTimeout(300);
+    // Close cascader
+    await adminPage.keyboard.press('Escape');
     await adminPage.getByRole('button', { name: '查 询' }).click();
     await waitForTableLoaded(adminPage);
 

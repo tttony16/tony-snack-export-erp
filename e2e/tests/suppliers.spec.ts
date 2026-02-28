@@ -10,11 +10,17 @@ import {
 
 test.describe('Suppliers Module', () => {
   let apiSupplierName: string;
+  let level1CategoryId: string;
 
   test.beforeAll(async () => {
     const { ApiClient } = await import('../fixtures/api-client');
     const api = await ApiClient.create('admin', 'admin123');
-    const data = makeSupplier();
+
+    // Get level-1 category ID for supplier creation
+    const tree = await api.getCategoryTree();
+    level1CategoryId = tree[0]?.id;
+
+    const data = makeSupplier({ supply_categories: [level1CategoryId] });
     apiSupplierName = data.name;
     await api.createSupplier(data);
     await api.dispose();
@@ -65,12 +71,14 @@ test.describe('Suppliers Module', () => {
     await firstRow.getByText('编辑').click();
     await expect(adminPage.getByText('编辑供应商').first()).toBeVisible();
 
-    // Click on supply categories multi-select
+    // Click on supply categories multi-select (now loads level-1 categories from API)
     const categoriesItem = adminPage.locator('.ant-form-item', { has: adminPage.getByText('供应品类', { exact: true }) });
     const select = categoriesItem.locator('.ant-select').first();
     await select.click();
-    // Select additional category
-    await adminPage.locator('.ant-select-dropdown:visible').getByText('糖果').first().click();
+    await adminPage.waitForTimeout(500);
+    // Select a category from the dropdown (level-1 categories loaded from API)
+    const dropdown = adminPage.locator('.ant-select-dropdown:visible');
+    await dropdown.locator('.ant-select-item-option').first().click();
     // Close dropdown
     await adminPage.keyboard.press('Escape');
 

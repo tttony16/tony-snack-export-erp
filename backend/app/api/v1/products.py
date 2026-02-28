@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_permission
 from app.core.permissions import Permission
 from app.database import get_db
-from app.models.enums import ProductCategory, ProductStatus
+from app.models.enums import ProductStatus
 from app.models.user import User
 from app.schemas.common import ApiResponse, PaginatedResponse
 from app.schemas.product import (
@@ -17,6 +17,7 @@ from app.schemas.product import (
     ProductStatusUpdate,
     ProductUpdate,
 )
+from app.services.product_category_service import ProductCategoryService
 from app.services.product_service import ProductService
 from app.utils.excel import create_template, create_workbook, read_workbook
 
@@ -26,7 +27,9 @@ PRODUCT_EXPORT_HEADERS = [
     "SKU编码",
     "中文名称",
     "英文名称",
-    "分类",
+    "一级品类",
+    "二级品类",
+    "三级品类",
     "品牌",
     "规格",
     "单件重量(kg)",
@@ -40,7 +43,7 @@ PRODUCT_IMPORT_HEADERS = [
     "sku_code",
     "name_cn",
     "name_en",
-    "category",
+    "category_name",
     "brand",
     "spec",
     "unit_weight_kg",
@@ -54,10 +57,21 @@ PRODUCT_IMPORT_HEADERS = [
 ]
 
 
+@router.get("/brands", response_model=ApiResponse[list[str]])
+async def list_brands(
+    user: User = Depends(require_permission(Permission.PRODUCT_VIEW)),
+    db: AsyncSession = Depends(get_db),
+):
+    service = ProductService(db)
+    brands = await service.get_brands()
+    return ApiResponse(data=brands)
+
+
 @router.get("", response_model=PaginatedResponse[ProductRead])
 async def list_products(
     keyword: str | None = None,
-    category: ProductCategory | None = None,
+    category_id: str | None = None,
+    brand: str | None = None,
     product_status: ProductStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -67,9 +81,11 @@ async def list_products(
     db: AsyncSession = Depends(get_db),
 ):
     service = ProductService(db)
+    parsed_category_id = uuid.UUID(category_id) if category_id else None
     params = ProductListParams(
         keyword=keyword,
-        category=category,
+        category_id=parsed_category_id,
+        brand=brand,
         status=product_status,
         page=page,
         page_size=page_size,
@@ -88,7 +104,9 @@ async def create_product(
 ):
     service = ProductService(db)
     product = await service.create(body, user.id)
-    return ApiResponse(data=ProductRead.model_validate(product))
+    read = ProductRead.model_validate(product)
+    await service.fill_category_names(read)
+    return ApiResponse(data=read)
 
 
 @router.post("/import", response_model=ApiResponse)
@@ -100,15 +118,31 @@ async def import_products(
     content = await file.read()
     rows = read_workbook(content)
     service = ProductService(db)
+    cat_service = ProductCategoryService(db)
+
+    # Build name→id lookup from category tree
+    all_cats = await cat_service.repo.get_all_ordered()
+    name_to_id: dict[str, uuid.UUID] = {}
+    for cat in all_cats:
+        name_to_id[cat.name] = cat.id
+
     created = 0
     errors = []
     for i, row in enumerate(rows):
         try:
+            category_name = str(row.get("category_name", row.get("category", "")))
+            cat_id = name_to_id.get(category_name)
+            if not cat_id:
+                # Fall back: try matching against level-1 "其他" category
+                cat_id = name_to_id.get("其他")
+            if not cat_id:
+                raise ValueError(f"品类 '{category_name}' 未找到")
+
             data = ProductCreate(
                 sku_code=str(row.get("sku_code", "")),
                 name_cn=str(row.get("name_cn", "")),
                 name_en=str(row.get("name_en", "")),
-                category=row.get("category", "other"),
+                category_id=cat_id,
                 spec=str(row.get("spec", "N/A")),
                 unit_weight_kg=row.get("unit_weight_kg", 0.1),
                 unit_volume_cbm=row.get("unit_volume_cbm", 0.001),
@@ -142,7 +176,9 @@ async def export_products(
                 p.sku_code,
                 p.name_cn,
                 p.name_en,
-                p.category.value if hasattr(p.category, "value") else str(p.category),
+                p.category_level1_name or "",
+                p.category_level2_name or "",
+                p.category_level3_name or "",
                 p.brand or "",
                 p.spec,
                 str(p.unit_weight_kg),
@@ -180,7 +216,9 @@ async def get_product(
 ):
     service = ProductService(db)
     product = await service.get_by_id(id)
-    return ApiResponse(data=ProductRead.model_validate(product))
+    read = ProductRead.model_validate(product)
+    await service.fill_category_names(read)
+    return ApiResponse(data=read)
 
 
 @router.put("/{id}", response_model=ApiResponse[ProductRead])
@@ -192,7 +230,9 @@ async def update_product(
 ):
     service = ProductService(db)
     product = await service.update(id, body, user.id)
-    return ApiResponse(data=ProductRead.model_validate(product))
+    read = ProductRead.model_validate(product)
+    await service.fill_category_names(read)
+    return ApiResponse(data=read)
 
 
 @router.patch("/{id}/status", response_model=ApiResponse[ProductRead])
@@ -204,4 +244,6 @@ async def update_product_status(
 ):
     service = ProductService(db)
     product = await service.update_status(id, body.status, user.id)
-    return ApiResponse(data=ProductRead.model_validate(product))
+    read = ProductRead.model_validate(product)
+    await service.fill_category_names(read)
+    return ApiResponse(data=read)

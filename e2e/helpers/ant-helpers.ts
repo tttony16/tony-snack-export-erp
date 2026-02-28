@@ -28,6 +28,29 @@ export async function selectAntOption(page: Page, fieldLabel: string, optionText
 }
 
 /**
+ * Select options from an Ant Design Cascader component identified by its label.
+ * Clicks through each level of the cascader sequentially.
+ * Scoped to the visible modal if one exists.
+ */
+export async function selectCascaderOption(page: Page, fieldLabel: string, optionTexts: string[]) {
+  const scope = getFormScope(page);
+  const formItem = scope.locator('.ant-form-item', { hasText: fieldLabel }).first();
+  const cascader = formItem.locator('.ant-cascader').first();
+  await cascader.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await cascader.click();
+  await page.waitForTimeout(500);
+
+  for (let i = 0; i < optionTexts.length; i++) {
+    const menuCol = page.locator('.ant-cascader-dropdown:visible .ant-cascader-menu').nth(i);
+    await menuCol.waitFor({ state: 'visible', timeout: 5000 });
+    const option = menuCol.locator('.ant-cascader-menu-item').filter({ hasText: optionTexts[i] }).first();
+    await option.click();
+    await page.waitForTimeout(300);
+  }
+}
+
+/**
  * Select an option from a ProFormSelect with search.
  */
 export async function selectSearchOption(page: Page, fieldLabel: string, searchText: string, optionText?: string) {

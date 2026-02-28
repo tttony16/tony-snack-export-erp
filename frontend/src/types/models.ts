@@ -1,5 +1,4 @@
 import type {
-  ProductCategory,
   ProductStatus,
   SalesOrderStatus,
   PurchaseOrderStatus,
@@ -65,6 +64,22 @@ export interface UserUpdate {
   is_active?: boolean;
 }
 
+// ===== Product Category =====
+
+export interface ProductCategoryRead {
+  id: string;
+  name: string;
+  level: number;
+  parent_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductCategoryTreeNode extends ProductCategoryRead {
+  children: ProductCategoryTreeNode[];
+}
+
 // ===== Product =====
 
 export interface ProductRead {
@@ -72,7 +87,10 @@ export interface ProductRead {
   sku_code: string;
   name_cn: string;
   name_en: string;
-  category: ProductCategory;
+  category_id: string;
+  category_level1_name: string | null;
+  category_level2_name: string | null;
+  category_level3_name: string | null;
   brand: string | null;
   barcode: string | null;
   spec: string;
@@ -98,7 +116,7 @@ export interface ProductCreate {
   sku_code: string;
   name_cn: string;
   name_en: string;
-  category: ProductCategory;
+  category_id: string;
   brand?: string;
   barcode?: string;
   spec: string;
@@ -120,7 +138,7 @@ export interface ProductCreate {
 export interface ProductUpdate {
   name_cn?: string;
   name_en?: string;
-  category?: ProductCategory;
+  category_id?: string;
   brand?: string;
   barcode?: string;
   spec?: string;
@@ -141,7 +159,8 @@ export interface ProductUpdate {
 
 export interface ProductListParams {
   keyword?: string;
-  category?: ProductCategory;
+  category_id?: string;
+  brand?: string;
   status?: ProductStatus;
   page?: number;
   page_size?: number;

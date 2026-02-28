@@ -9,6 +9,7 @@ from app.models.container import (
 from app.models.customer import Customer
 from app.models.logistics import LogisticsCost, LogisticsRecord
 from app.models.product import Product
+from app.models.product_category import ProductCategoryModel
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 from app.models.sales_order import SalesOrder, SalesOrderItem
 from app.models.supplier import Supplier, SupplierProduct
@@ -28,6 +29,7 @@ __all__ = [
     "LogisticsCost",
     "LogisticsRecord",
     "Product",
+    "ProductCategoryModel",
     "PurchaseOrder",
     "PurchaseOrderItem",
     "ReceivingNote",

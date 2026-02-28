@@ -253,6 +253,41 @@ export class ApiClient {
     return this.del(`/logistics/${logisticsId}/costs/${costId}`);
   }
 
+  // --- Product Categories ---
+  async getCategoryTree() {
+    return this.get('/product-categories/tree');
+  }
+
+  async createCategory(data: Record<string, unknown>) {
+    return this.post('/product-categories', data);
+  }
+
+  /**
+   * Ensure a 3-level category chain exists under a given level-1 category.
+   * Returns the level-3 category ID and the level-1 category ID.
+   */
+  async ensureCategoryChain(level1Name?: string): Promise<{ categoryId: string; level1Id: string }> {
+    const tree = await this.getCategoryTree();
+    const level1 = level1Name
+      ? tree.find((n: any) => n.name === level1Name)
+      : tree[0];
+    if (!level1) throw new Error(`Level-1 category not found: ${level1Name || 'any'}`);
+
+    // Find or create level-2
+    let level2 = level1.children?.[0];
+    if (!level2) {
+      level2 = await this.createCategory({ name: 'E2E二级品类', parent_id: level1.id, sort_order: 0 });
+    }
+
+    // Find or create level-3
+    let level3 = level2.children?.[0];
+    if (!level3) {
+      level3 = await this.createCategory({ name: 'E2E三级品类', parent_id: level2.id, sort_order: 0 });
+    }
+
+    return { categoryId: level3.id, level1Id: level1.id };
+  }
+
   // --- System ---
   async createUser(data: Record<string, unknown>) {
     return this.post('/system/users', data);

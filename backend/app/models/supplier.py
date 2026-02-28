@@ -15,7 +15,9 @@ class Supplier(AuditMixin, Base):
     contact_person: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[str] = mapped_column(String(50), nullable=False)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    supply_categories: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
+    supply_categories: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), nullable=True
+    )
     supply_brands: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     payment_terms: Mapped[str | None] = mapped_column(String(200), nullable=True)
     business_license: Mapped[str | None] = mapped_column(String(100), nullable=True)

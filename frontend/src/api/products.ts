@@ -6,6 +6,10 @@ export async function listProducts(params: ProductListParams): Promise<Paginated
   return request.get('/products', { params });
 }
 
+export async function listBrands(): Promise<string[]> {
+  return request.get('/products/brands');
+}
+
 export async function getProduct(id: string): Promise<ProductRead> {
   return request.get(`/products/${id}`);
 }

@@ -4,14 +4,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import ProductCategory, ProductStatus
+from app.models.enums import ProductStatus
 
 
 class ProductCreate(BaseModel):
     sku_code: str = Field(..., min_length=1, max_length=50)
     name_cn: str = Field(..., min_length=1, max_length=200)
     name_en: str = Field(..., min_length=1, max_length=200)
-    category: ProductCategory
+    category_id: uuid.UUID
     brand: str | None = None
     barcode: str | None = None
     spec: str = Field(..., min_length=1, max_length=200)
@@ -33,7 +33,7 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name_cn: str | None = Field(default=None, min_length=1, max_length=200)
     name_en: str | None = Field(default=None, min_length=1, max_length=200)
-    category: ProductCategory | None = None
+    category_id: uuid.UUID | None = None
     brand: str | None = None
     barcode: str | None = None
     spec: str | None = Field(default=None, min_length=1, max_length=200)
@@ -57,7 +57,10 @@ class ProductRead(BaseModel):
     sku_code: str
     name_cn: str
     name_en: str
-    category: ProductCategory
+    category_id: uuid.UUID
+    category_level1_name: str | None = None
+    category_level2_name: str | None = None
+    category_level3_name: str | None = None
     brand: str | None = None
     barcode: str | None = None
     spec: str
@@ -83,7 +86,8 @@ class ProductRead(BaseModel):
 
 class ProductListParams(BaseModel):
     keyword: str | None = None
-    category: ProductCategory | None = None
+    category_id: uuid.UUID | None = None
+    brand: str | None = None
     status: ProductStatus | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)

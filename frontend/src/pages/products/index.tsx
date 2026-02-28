@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Button, Switch, message } from 'antd';
 import { PlusOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons';
-import { listProducts, updateProductStatus, importProducts } from '@/api/products';
-import { ProductCategoryLabels, ProductStatusLabels } from '@/types/api';
+import { listProducts, listBrands, updateProductStatus, importProducts } from '@/api/products';
+import { ProductStatusLabels } from '@/types/api';
 import type { ProductRead } from '@/types/models';
 import { formatDateTime } from '@/utils/format';
 import { useExport } from '@/hooks/useExport';
 import { downloadFile } from '@/utils/download';
 import PermissionButton from '@/components/PermissionButton';
+import CategoryCascader from '@/components/CategoryCascader';
 import ProductForm from './ProductForm';
 
 export default function ProductsPage() {
@@ -20,16 +21,46 @@ export default function ProductsPage() {
   const { exporting, handleExport } = useExport('/products/export', '商品列表.xlsx');
 
   const columns: ProColumns<ProductRead>[] = [
-    { title: 'SKU', dataIndex: 'sku_code', width: 120 },
-    { title: '中文名称', dataIndex: 'name_cn', ellipsis: true },
+    {
+      title: '关键词',
+      dataIndex: 'keyword',
+      hideInTable: true,
+      fieldProps: { placeholder: '搜索 SKU / 名称' },
+    },
+    { title: 'SKU', dataIndex: 'sku_code', width: 140, hideInSearch: true },
+    { title: '中文名称', dataIndex: 'name_cn', ellipsis: true, hideInSearch: true },
     { title: '英文名称', dataIndex: 'name_en', ellipsis: true, hideInSearch: true },
     {
       title: '分类',
-      dataIndex: 'category',
-      valueEnum: ProductCategoryLabels,
-      width: 100,
+      dataIndex: 'category_id',
+      width: 180,
+      render: (_, record) => {
+        const parts = [
+          record.category_level1_name,
+          record.category_level2_name,
+          record.category_level3_name,
+        ].filter(Boolean);
+        return parts.join(' / ') || '-';
+      },
+      renderFormItem: (_, { value, onChange }) => (
+        <CategoryCascader
+          allowAnyLevel
+          placeholder="按品类筛选"
+          value={value}
+          onChange={onChange}
+        />
+      ),
     },
-    { title: '品牌', dataIndex: 'brand', width: 100, hideInSearch: true },
+    {
+      title: '品牌',
+      dataIndex: 'brand',
+      width: 100,
+      valueType: 'select',
+      request: async () => {
+        const brands = await listBrands();
+        return brands.map((b) => ({ value: b, label: b }));
+      },
+    },
     { title: '规格', dataIndex: 'spec', width: 120, hideInSearch: true },
     {
       title: '状态',
@@ -82,16 +113,16 @@ export default function ProductsPage() {
         columns={columns}
         params={{ keyword: searchParams.get('keyword') || undefined }}
         request={async (params) => {
-          const { current, pageSize, keyword, ...rest } = params;
+          const { current, pageSize, ...rest } = params;
           const data = await listProducts({
             page: current,
             page_size: pageSize,
-            keyword,
             ...rest,
           });
           return { data: data.items, total: data.total, success: true };
         }}
-        search={{ labelWidth: 'auto' }}
+        search={{ labelWidth: 'auto', defaultCollapsed: false }}
+        scroll={{ x: 1200 }}
         toolBarRender={() => [
           <PermissionButton
             key="add"

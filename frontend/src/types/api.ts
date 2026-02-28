@@ -30,35 +30,6 @@ export interface ListParams {
 
 // ===== Enums =====
 
-export const ProductCategory = {
-  puffed_food: 'puffed_food',
-  candy: 'candy',
-  biscuit: 'biscuit',
-  nut: 'nut',
-  beverage: 'beverage',
-  seasoning: 'seasoning',
-  instant_noodle: 'instant_noodle',
-  dried_fruit: 'dried_fruit',
-  chocolate: 'chocolate',
-  jelly: 'jelly',
-  other: 'other',
-} as const;
-export type ProductCategory = (typeof ProductCategory)[keyof typeof ProductCategory];
-
-export const ProductCategoryLabels: Record<ProductCategory, string> = {
-  puffed_food: '膨化食品',
-  candy: '糖果',
-  biscuit: '饼干',
-  nut: '坚果',
-  beverage: '饮料',
-  seasoning: '调味品',
-  instant_noodle: '方便面',
-  dried_fruit: '果干',
-  chocolate: '巧克力',
-  jelly: '果冻',
-  other: '其他',
-};
-
 export const ProductStatus = {
   active: 'active',
   inactive: 'inactive',

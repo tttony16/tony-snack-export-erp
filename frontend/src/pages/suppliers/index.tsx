@@ -4,11 +4,10 @@ import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-
 import { Space, Tag } from 'antd';
 import { PlusOutlined, DownloadOutlined } from '@ant-design/icons';
 import { listSuppliers } from '@/api/suppliers';
-import { ProductCategoryLabels } from '@/types/api';
-import type { ProductCategory } from '@/types/api';
 import type { SupplierRead } from '@/types/models';
 import { formatDateTime } from '@/utils/format';
 import { useExport } from '@/hooks/useExport';
+import { useCategoryMap } from '@/hooks/useCategoryMap';
 import PermissionButton from '@/components/PermissionButton';
 import SupplierForm from './SupplierForm';
 import SupplierProducts from './SupplierProducts';
@@ -21,6 +20,7 @@ export default function SuppliersPage() {
   const [productsOpen, setProductsOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierRead>();
   const { exporting, handleExport } = useExport('/suppliers/export', '供应商列表.xlsx');
+  const { getCategoryName } = useCategoryMap();
 
   const columns: ProColumns<SupplierRead>[] = [
     { title: '供应商编码', dataIndex: 'supplier_code', width: 120 },
@@ -33,7 +33,7 @@ export default function SuppliersPage() {
       hideInSearch: true,
       render: (_, record) =>
         record.supply_categories?.map((c) => (
-          <Tag key={c}>{ProductCategoryLabels[c as ProductCategory] || c}</Tag>
+          <Tag key={c}>{getCategoryName(c)}</Tag>
         )) || '-',
     },
     {

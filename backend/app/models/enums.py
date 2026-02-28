@@ -1,19 +1,6 @@
 import enum
 
 
-class ProductCategory(str, enum.Enum):
-    PUFFED_FOOD = "puffed_food"
-    CANDY = "candy"
-    BISCUIT = "biscuit"
-    NUT = "nut"
-    BEVERAGE = "beverage"
-    SEASONING = "seasoning"
-    INSTANT_NOODLE = "instant_noodle"
-    DRIED_FRUIT = "dried_fruit"
-    CHOCOLATE = "chocolate"
-    JELLY = "jelly"
-    OTHER = "other"
-
 
 class ProductStatus(str, enum.Enum):
     ACTIVE = "active"

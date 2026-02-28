@@ -8,10 +8,14 @@ from app.models.enums import (
     CurrencyType,
     InspectionResult,
     PaymentMethod,
-    ProductCategory,
     TradeTerm,
     UnitType,
 )
+
+# Same deterministic UUID generation as migration/seed
+_NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+CATEGORY_ID_CANDY = uuid.uuid5(_NAMESPACE, "candy")
+CATEGORY_ID_BISCUIT = uuid.uuid5(_NAMESPACE, "biscuit")
 
 
 def make_product_data(**overrides) -> dict:
@@ -19,7 +23,7 @@ def make_product_data(**overrides) -> dict:
         "sku_code": f"SKU-{uuid.uuid4().hex[:8].upper()}",
         "name_cn": "测试零食",
         "name_en": "Test Snack",
-        "category": ProductCategory.CANDY.value,
+        "category_id": str(CATEGORY_ID_CANDY),
         "brand": "测试品牌",
         "spec": "500g/袋",
         "unit_weight_kg": "0.550",

@@ -10,8 +10,7 @@ import {
   type ProFormInstance,
 } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { Button, message, Popover, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { message, Space } from 'antd';
 import { createSalesOrder, updateSalesOrder } from '@/api/salesOrders';
 import { listCustomers } from '@/api/customers';
 import { listProducts } from '@/api/products';
@@ -23,6 +22,7 @@ import {
 } from '@/types/api';
 import type { SalesOrderRead, SalesOrderItemCreate } from '@/types/models';
 import EntitySelect from '@/components/EntitySelect';
+import ProductPicker from '@/components/ProductPicker';
 
 interface Props {
   open: boolean;
@@ -40,14 +40,11 @@ export default function SalesOrderForm({ open, onClose, onSuccess, record }: Pro
   const [editableKeys, setEditableKeys] = useState<React.Key[]>(
     () => record?.items?.map((item) => item.id) || [],
   );
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
 
-  const handleBatchAdd = () => {
-    if (selectedProducts.length === 0) return;
+  const handleBatchAdd = (productIds: string[]) => {
     const currentItems: EditableItem[] = formRef.current?.getFieldValue('items') || [];
     const existingProductIds = new Set(currentItems.map((i) => i.product_id));
-    const newItems: EditableItem[] = selectedProducts
+    const newItems: EditableItem[] = productIds
       .filter((pid) => !existingProductIds.has(pid))
       .map((pid) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -58,15 +55,11 @@ export default function SalesOrderForm({ open, onClose, onSuccess, record }: Pro
       }));
     if (newItems.length === 0) {
       message.info('所选商品已在明细中');
-      setSelectedProducts([]);
-      setPickerOpen(false);
       return;
     }
     const allItems = [...currentItems, ...newItems];
     formRef.current?.setFieldsValue({ items: allItems });
     setEditableKeys(allItems.map((i) => i.id!));
-    setSelectedProducts([]);
-    setPickerOpen(false);
   };
 
   const itemColumns: ProColumns<EditableItem>[] = [
@@ -167,32 +160,7 @@ export default function SalesOrderForm({ open, onClose, onSuccess, record }: Pro
         headerTitle={
           <Space>
             订单明细
-            <Popover
-              open={pickerOpen}
-              onOpenChange={setPickerOpen}
-              trigger="click"
-              placement="bottomLeft"
-              content={
-                <div style={{ width: 320 }}>
-                  <EntitySelect
-                    mode="multiple"
-                    fetchFn={listProducts}
-                    labelField="name_cn"
-                    placeholder="搜索并选择商品"
-                    value={selectedProducts}
-                    onChange={(val) => setSelectedProducts(val as string[])}
-                    style={{ width: '100%', marginBottom: 8 }}
-                  />
-                  <Button type="primary" block onClick={handleBatchAdd}>
-                    添加到明细
-                  </Button>
-                </div>
-              }
-            >
-              <Button type="primary" size="small" icon={<PlusOutlined />}>
-                添加商品
-              </Button>
-            </Popover>
+            <ProductPicker onAdd={handleBatchAdd} />
           </Space>
         }
         columns={itemColumns}

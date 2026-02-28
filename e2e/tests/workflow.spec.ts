@@ -25,9 +25,12 @@ test.describe.serial('End-to-End Business Workflow', () => {
   test('Step 1: Create base data via API', async ({ adminPage }) => {
     const api = await ApiClient.create('admin', 'admin123');
 
-    const product = makeProduct({ category: 'biscuit' });
+    // Ensure a 3-level category chain exists
+    const { categoryId, level1Id } = await api.ensureCategoryChain('饼干');
+
+    const product = makeProduct({ category_id: categoryId });
     const customer = makeCustomer();
-    const supplier = makeSupplier();
+    const supplier = makeSupplier({ supply_categories: [level1Id] });
 
     productName = product.name_cn;
     customerName = customer.name;

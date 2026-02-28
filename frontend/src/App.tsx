@@ -22,6 +22,7 @@ const LogisticsDetail = lazy(() => import('@/pages/logistics/LogisticsDetail'));
 const SystemUsers = lazy(() => import('@/pages/system/users'));
 const AuditLogs = lazy(() => import('@/pages/system/audit-logs'));
 const SystemConfigs = lazy(() => import('@/pages/system/configs'));
+const Categories = lazy(() => import('@/pages/system/categories'));
 const Statistics = lazy(() => import('@/pages/statistics'));
 const NotFound = lazy(() => import('@/components/NotFound'));
 
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="logistics" element={<Logistics />} />
           <Route path="logistics/:id" element={<LogisticsDetail />} />
           <Route path="system/users" element={<SystemUsers />} />
+          <Route path="system/categories" element={<Categories />} />
           <Route path="system/audit-logs" element={<AuditLogs />} />
           <Route path="system/configs" element={<SystemConfigs />} />
           <Route path="statistics" element={<Statistics />} />

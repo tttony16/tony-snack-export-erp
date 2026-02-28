@@ -14,6 +14,7 @@ from app.database import get_db
 from app.main import app
 from app.models import Base
 from app.models.enums import UserRole
+from app.models.product_category import ProductCategoryModel
 from app.models.user import User
 
 # Use a separate test database
@@ -25,22 +26,6 @@ TEST_DATABASE_URL = (
 
 _ENUM_DEFS = [
     ("user_role", ["super_admin", "admin", "sales", "purchaser", "warehouse", "viewer"]),
-    (
-        "product_category",
-        [
-            "puffed_food",
-            "candy",
-            "biscuit",
-            "nut",
-            "beverage",
-            "seasoning",
-            "instant_noodle",
-            "dried_fruit",
-            "chocolate",
-            "jelly",
-            "other",
-        ],
-    ),
     ("product_status", ["active", "inactive"]),
     (
         "currency_type",
@@ -133,6 +118,36 @@ async def _ensure_test_db_ready():
             enum = PG_ENUM(*values, name=name, create_type=False)
             await conn.run_sync(lambda sc, e=enum: e.create(sc, checkfirst=True))
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed level-1 categories if the table is empty
+    _NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    _CATEGORY_SEEDS = [
+        ("puffed_food", "膨化食品", 0),
+        ("candy", "糖果", 1),
+        ("biscuit", "饼干", 2),
+        ("nut", "坚果", 3),
+        ("beverage", "饮料", 4),
+        ("seasoning", "调味品", 5),
+        ("instant_noodle", "方便面", 6),
+        ("dried_fruit", "果干", 7),
+        ("chocolate", "巧克力", 8),
+        ("jelly", "果冻", 9),
+        ("other", "其他", 10),
+    ]
+    factory = async_sessionmaker(setup_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        result = await session.execute(text("SELECT count(*) FROM product_categories"))
+        if result.scalar() == 0:
+            for key, name, sort in _CATEGORY_SEEDS:
+                cat = ProductCategoryModel(
+                    id=uuid.uuid5(_NAMESPACE, key),
+                    name=name,
+                    level=1,
+                    parent_id=None,
+                    sort_order=sort,
+                )
+                session.add(cat)
+            await session.commit()
     await setup_engine.dispose()
 
 

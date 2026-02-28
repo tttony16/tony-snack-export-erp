@@ -47,6 +47,7 @@ const allMenus: (MenuDataItem & { permission?: string })[] = [
     permission: 'user:manage',
     children: [
       { path: '/system/users', name: '用户管理' },
+      { path: '/system/categories', name: '品类管理' },
       { path: '/system/audit-logs', name: '审计日志' },
       { path: '/system/configs', name: '系统配置' },
     ],

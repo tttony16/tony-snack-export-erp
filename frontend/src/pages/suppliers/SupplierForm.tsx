@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { ModalForm, ProFormText, ProFormTextArea, ProFormSelect } from '@ant-design/pro-components';
-import { message, Form, Input, Button, Space } from 'antd';
+import { message, Form, Input, Button, Select, Space } from 'antd';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import { createSupplier, updateSupplier } from '@/api/suppliers';
-import { ProductCategoryLabels } from '@/types/api';
+import { getCategoryTree } from '@/api/productCategories';
+import type { ProductCategoryTreeNode } from '@/types/models';
 import type { SupplierRead } from '@/types/models';
 
 interface Props {
@@ -14,6 +16,20 @@ interface Props {
 
 export default function SupplierForm({ open, onClose, onSuccess, record }: Props) {
   const isEdit = !!record;
+  const [level1Options, setLevel1Options] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      getCategoryTree().then((tree) => {
+        setLevel1Options(
+          tree.map((node: ProductCategoryTreeNode) => ({
+            value: node.id,
+            label: node.name,
+          })),
+        );
+      });
+    }
+  }, [open]);
 
   return (
     <ModalForm
@@ -40,12 +56,14 @@ export default function SupplierForm({ open, onClose, onSuccess, record }: Props
       <ProFormText name="contact_person" label="联系人" rules={[{ required: true, max: 100 }]} />
       <ProFormText name="phone" label="电话" rules={[{ required: true, max: 50 }]} />
       <ProFormText name="payment_terms" label="付款条件" />
-      <ProFormSelect
-        name="supply_categories"
-        label="供应品类"
-        mode="multiple"
-        valueEnum={ProductCategoryLabels}
-      />
+      <Form.Item name="supply_categories" label="供应品类">
+        <Select
+          mode="multiple"
+          options={level1Options}
+          placeholder="请选择供应品类"
+          allowClear
+        />
+      </Form.Item>
       <ProFormSelect
         name="supply_brands"
         label="供应品牌"

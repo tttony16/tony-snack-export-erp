@@ -8,7 +8,7 @@ export function makeProduct(overrides?: Record<string, unknown>) {
     sku_code: `SKU-E2E-${id}`,
     name_cn: `测试商品-${id}`,
     name_en: `Test Product ${id}`,
-    category: 'biscuit',
+    category_id: '', // Must be set to a valid level-3 category UUID
     brand: 'E2E Brand',
     spec: '500g/袋',
     packing_spec: '20袋/箱',
@@ -43,7 +43,7 @@ export function makeSupplier(overrides?: Record<string, unknown>) {
     name: `E2E供应商-${id}`,
     contact_person: `供应联系人-${id}`,
     phone: '13800138000',
-    supply_categories: ['biscuit'],
+    supply_categories: [] as string[], // Must be set to level-1 category UUIDs
     ...overrides,
   };
 }

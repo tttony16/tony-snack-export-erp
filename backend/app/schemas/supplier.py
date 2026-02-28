@@ -10,7 +10,7 @@ class SupplierCreate(BaseModel):
     contact_person: str = Field(..., min_length=1, max_length=100)
     phone: str = Field(..., min_length=1, max_length=50)
     address: str | None = None
-    supply_categories: list[str] | None = None
+    supply_categories: list[uuid.UUID] | None = None
     supply_brands: list[str] | None = None
     payment_terms: str | None = None
     business_license: str | None = None
@@ -24,7 +24,7 @@ class SupplierUpdate(BaseModel):
     contact_person: str | None = Field(default=None, min_length=1, max_length=100)
     phone: str | None = Field(default=None, min_length=1, max_length=50)
     address: str | None = None
-    supply_categories: list[str] | None = None
+    supply_categories: list[uuid.UUID] | None = None
     supply_brands: list[str] | None = None
     payment_terms: str | None = None
     business_license: str | None = None
@@ -40,7 +40,7 @@ class SupplierRead(BaseModel):
     contact_person: str
     phone: str
     address: str | None = None
-    supply_categories: list[str] | None = None
+    supply_categories: list[uuid.UUID] | None = None
     supply_brands: list[str] | None = None
     payment_terms: str | None = None
     business_license: str | None = None

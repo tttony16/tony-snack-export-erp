@@ -1,10 +1,10 @@
-import { ModalForm, ProFormText, ProFormDigit, ProFormSelect, ProFormTextArea, ProFormDependency } from '@ant-design/pro-components';
+import { ModalForm, ProFormText, ProFormDigit, ProFormTextArea, ProFormDependency } from '@ant-design/pro-components';
 import { message, Image, Form } from 'antd';
 import { createProduct, updateProduct } from '@/api/products';
 import { listSuppliers } from '@/api/suppliers';
-import { ProductCategoryLabels } from '@/types/api';
 import type { ProductRead } from '@/types/models';
 import EntitySelect from '@/components/EntitySelect';
+import CategoryCascader from '@/components/CategoryCascader';
 
 interface Props {
   open: boolean;
@@ -45,12 +45,9 @@ export default function ProductForm({ open, onClose, onSuccess, record }: Props)
       />
       <ProFormText name="name_cn" label="中文名称" rules={[{ required: true, max: 200 }]} />
       <ProFormText name="name_en" label="英文名称" rules={[{ required: true, max: 200 }]} />
-      <ProFormSelect
-        name="category"
-        label="分类"
-        valueEnum={ProductCategoryLabels}
-        rules={[{ required: true }]}
-      />
+      <Form.Item name="category_id" label="分类" rules={[{ required: true, message: '请选择分类' }]}>
+        <CategoryCascader />
+      </Form.Item>
       <ProFormText name="brand" label="品牌" />
       <ProFormText name="barcode" label="条码" />
       <ProFormText name="spec" label="规格" rules={[{ required: true, max: 200 }]} />

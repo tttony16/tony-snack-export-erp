@@ -6,6 +6,7 @@ from app.api.v1 import (
     customers,
     dashboard,
     logistics,
+    product_categories,
     products,
     purchase_orders,
     sales_orders,
@@ -18,6 +19,7 @@ from app.api.v1 import (
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth.router)
+api_router.include_router(product_categories.router)
 api_router.include_router(products.router)
 api_router.include_router(customers.router)
 api_router.include_router(suppliers.router)

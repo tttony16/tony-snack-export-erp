@@ -117,14 +117,32 @@ export function makeReceivingNote(
 }
 
 export function makeContainerPlan(
-  salesOrderIds: string[],
+  salesOrderIds?: string[],
   overrides?: Record<string, unknown>,
 ) {
   return {
-    sales_order_ids: salesOrderIds,
+    sales_order_ids: salesOrderIds || [],
     container_type: '40HQ',
     container_count: 1,
     destination_port: 'Bangkok',
+    ...overrides,
+  };
+}
+
+export function makeOutboundOrder(
+  containerPlanId: string,
+  overrides?: Record<string, unknown>,
+) {
+  return {
+    container_plan_id: containerPlanId,
+    ...overrides,
+  };
+}
+
+export function makeOutboundConfirm(overrides?: Record<string, unknown>) {
+  return {
+    outbound_date: new Date().toISOString().split('T')[0],
+    operator: 'E2E Tester',
     ...overrides,
   };
 }

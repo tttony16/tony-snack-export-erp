@@ -9,6 +9,7 @@ import type {
   ReceivingNoteItemRead,
   InventoryByProductRead,
   InventoryByOrderRead,
+  InventoryBatchRead,
   InventoryListParams,
   ReadinessCheckResponse,
 } from '@/types/models';
@@ -41,6 +42,17 @@ export async function getInventoryByOrder(salesOrderId: string): Promise<Invento
 
 export async function checkReadiness(salesOrderId: string): Promise<ReadinessCheckResponse> {
   return request.get(`/warehouse/inventory/readiness/${salesOrderId}`);
+}
+
+// Inventory Batches
+export async function listInventoryBatches(params: {
+  product_id?: string;
+  sales_order_id?: string;
+  destination_port?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<InventoryBatchRead[]> {
+  return request.get('/warehouse/inventory/batches', { params });
 }
 
 // Pending Inspection

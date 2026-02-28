@@ -2,15 +2,18 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageContainer } from '@ant-design/pro-components';
 import { Descriptions, Table, Card, Space, Button, Row, Col, message, Spin, Alert, Image, Modal, Input } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlusOutlined } from '@ant-design/icons';
 import {
   getContainerPlan,
   getContainerSummary,
   recommendContainerType,
   validateContainer,
   confirmContainerPlan,
+  cancelContainerPlan,
   uploadStuffingPhoto,
+  addContainerItem,
 } from '@/api/containers';
+import { createOutboundOrder } from '@/api/outbound';
 import {
   ContainerPlanStatusLabels,
   ContainerPlanStatusColors,
@@ -22,6 +25,7 @@ import { downloadFile } from '@/utils/download';
 import StatusTag from '@/components/StatusTag';
 import PermissionButton from '@/components/PermissionButton';
 import ContainerSummaryCard from './ContainerSummaryCard';
+import InventoryBatchPicker, { type BatchPickerResult } from '@/components/InventoryBatchPicker';
 
 export default function ContainerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +38,7 @@ export default function ContainerDetailPage() {
   const [photoRecordId, setPhotoRecordId] = useState<string>('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoDesc, setPhotoDesc] = useState('');
+  const [batchPickerOpen, setBatchPickerOpen] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -70,6 +75,30 @@ export default function ContainerDetailPage() {
     load();
   };
 
+  const handleCancel = async () => {
+    Modal.confirm({
+      title: '取消排柜计划',
+      content: '取消后将释放已预留的库存，确认取消？',
+      onOk: async () => {
+        await cancelContainerPlan(plan.id);
+        message.success('已取消');
+        load();
+      },
+    });
+  };
+
+  const handleCreateOutbound = async () => {
+    Modal.confirm({
+      title: '创建出库单',
+      content: '将根据当前排柜计划创建出库单草稿，确认继续？',
+      onOk: async () => {
+        const order = await createOutboundOrder({ container_plan_id: plan.id });
+        message.success(`出库单 ${order.order_no} 创建成功`);
+        navigate(`/outbound/${order.id}`);
+      },
+    });
+  };
+
   const handleRecommend = async () => {
     const result = await recommendContainerType(plan.id);
     const recs = result.recommendations
@@ -99,6 +128,20 @@ export default function ContainerDetailPage() {
     load();
   };
 
+  const handleBatchSelect = async (result: BatchPickerResult) => {
+    if (!id) return;
+    await addContainerItem(id, {
+      container_seq: 1,
+      inventory_record_id: result.inventory_record_id,
+      quantity: result.quantity,
+      volume_cbm: 0,
+      weight_kg: 0,
+    });
+    message.success('配载添加成功');
+    setBatchPickerOpen(false);
+    load();
+  };
+
   return (
     <PageContainer
       title={`排柜计划 ${plan.plan_no}`}
@@ -112,6 +155,16 @@ export default function ContainerDetailPage() {
                 确认
               </PermissionButton>
             </>
+          )}
+          {plan.status === 'confirmed' && (
+            <PermissionButton permission="container:confirm" danger onClick={handleCancel}>
+              取消计划
+            </PermissionButton>
+          )}
+          {plan.status === 'loaded' && (
+            <PermissionButton permission="outbound:edit" type="primary" onClick={handleCreateOutbound}>
+              创建出库单
+            </PermissionButton>
           )}
           {plan.status !== 'planning' && (
             <PermissionButton
@@ -159,7 +212,21 @@ export default function ContainerDetailPage() {
         ))}
       </Row>
 
-      <Card title="装柜明细" style={{ marginBottom: 16 }}>
+      <Card
+        title="装柜明细"
+        style={{ marginBottom: 16 }}
+        extra={
+          plan.status === 'planning' && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setBatchPickerOpen(true)}
+            >
+              添加配载
+            </Button>
+          )
+        }
+      >
         <Table
           dataSource={plan.items}
           rowKey="id"
@@ -167,7 +234,9 @@ export default function ContainerDetailPage() {
           columns={[
             { title: '柜序号', dataIndex: 'container_seq', width: 80 },
             { title: '商品ID', dataIndex: 'product_id', ellipsis: true },
-            { title: '销售单ID', dataIndex: 'sales_order_id', ellipsis: true },
+            { title: '批次号', dataIndex: 'batch_no', width: 130 },
+            { title: '生产日期', dataIndex: 'production_date', width: 110, render: (v) => v ? formatDate(v as string) : '-' },
+            { title: '销售单ID', dataIndex: 'sales_order_id', ellipsis: true, render: (v) => v || '-' },
             { title: '数量', dataIndex: 'quantity', width: 80 },
             { title: '体积(cbm)', dataIndex: 'volume_cbm', width: 100, render: (v) => formatDecimal(v as number) },
             { title: '重量(kg)', dataIndex: 'weight_kg', width: 100, render: (v) => formatDecimal(v as number) },
@@ -256,6 +325,12 @@ export default function ContainerDetailPage() {
           />
         </div>
       </Modal>
+
+      <InventoryBatchPicker
+        open={batchPickerOpen}
+        onClose={() => setBatchPickerOpen(false)}
+        onSelect={handleBatchSelect}
+      />
     </PageContainer>
   );
 }

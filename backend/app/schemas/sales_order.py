@@ -32,6 +32,8 @@ class SalesOrderItemRead(BaseModel):
     amount: Decimal
     purchased_quantity: int
     received_quantity: int
+    reserved_quantity: int = 0
+    outbound_quantity: int = 0
     created_at: datetime
     updated_at: datetime
 

@@ -207,6 +207,11 @@ export class ApiClient {
     return this.get(`/warehouse/inventory/readiness/${salesOrderId}`);
   }
 
+  // --- Warehouse (Inventory Batches) ---
+  async listInventoryBatches(params?: Record<string, string>) {
+    return this.get('/warehouse/inventory/batches', params);
+  }
+
   // --- Containers ---
   async createContainerPlan(data: Record<string, unknown>) {
     return this.post('/containers', data);
@@ -220,6 +225,10 @@ export class ApiClient {
     return this.get('/containers', params);
   }
 
+  async addContainerItem(planId: string, data: Record<string, unknown>) {
+    return this.post(`/containers/${planId}/items`, data);
+  }
+
   async validateContainerPlan(id: string) {
     return this.post(`/containers/${id}/validate`);
   }
@@ -228,8 +237,37 @@ export class ApiClient {
     return this.post(`/containers/${id}/confirm`);
   }
 
+  async cancelContainerPlan(id: string) {
+    return this.post(`/containers/${id}/cancel`);
+  }
+
   async getContainerSummary(id: string) {
     return this.get(`/containers/${id}/summary`);
+  }
+
+  async recordStuffing(planId: string, data: Record<string, unknown>) {
+    return this.post(`/containers/${planId}/stuffing`, data);
+  }
+
+  // --- Outbound Orders ---
+  async createOutboundOrder(data: Record<string, unknown>) {
+    return this.post('/outbound-orders', data);
+  }
+
+  async getOutboundOrder(id: string) {
+    return this.get(`/outbound-orders/${id}`);
+  }
+
+  async listOutboundOrders(params?: Record<string, string>) {
+    return this.get('/outbound-orders', params);
+  }
+
+  async confirmOutboundOrder(id: string, data: Record<string, unknown>) {
+    return this.post(`/outbound-orders/${id}/confirm`, data);
+  }
+
+  async cancelOutboundOrder(id: string) {
+    return this.post(`/outbound-orders/${id}/cancel`);
   }
 
   // --- Logistics ---

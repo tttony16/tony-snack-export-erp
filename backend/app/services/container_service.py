@@ -15,7 +15,8 @@ from app.models.container import (
     ContainerStuffingRecord,
 )
 from app.models.enums import ContainerPlanStatus, SalesOrderStatus
-from app.models.sales_order import SalesOrder
+from app.models.sales_order import SalesOrder, SalesOrderItem
+from app.models.warehouse import InventoryRecord
 from app.repositories.container_repo import ContainerPlanRepository
 from app.repositories.warehouse_repo import InventoryRepository
 from app.schemas.common import PaginatedData
@@ -54,28 +55,39 @@ class ContainerService:
     # ==================== CRUD ====================
 
     async def create(self, data: ContainerPlanCreate, user_id: uuid.UUID) -> ContainerPlan:
-        # R04: validate all linked SOs are goods_ready
         destination_ports = set()
-        for so_id in data.sales_order_ids:
-            result = await self.db.execute(select(SalesOrder).where(SalesOrder.id == so_id))
-            so = result.scalar_one_or_none()
-            if not so:
-                raise NotFoundError("销售订单", str(so_id))
-            if so.status != SalesOrderStatus.GOODS_READY:
+
+        # If sales_order_ids provided, validate them (R04 - optional now)
+        if data.sales_order_ids:
+            for so_id in data.sales_order_ids:
+                result = await self.db.execute(select(SalesOrder).where(SalesOrder.id == so_id))
+                so = result.scalar_one_or_none()
+                if not so:
+                    raise NotFoundError("销售订单", str(so_id))
+                if so.status != SalesOrderStatus.GOODS_READY:
+                    raise BusinessError(
+                        code=42250,
+                        message=f"订单 {so.order_no} 状态为 {so.status.value}，需为'已到齐'才可排柜",
+                    )
+                destination_ports.add(so.destination_port)
+
+            # R08: validate destination port consistency
+            if len(destination_ports) > 1:
                 raise BusinessError(
-                    code=42250,
-                    message=f"订单 {so.order_no} 状态为 {so.status.value}，需为'已到齐'才可排柜",
+                    code=42253,
+                    message=f"合柜的销售订单目的港不一致: {', '.join(destination_ports)}",
                 )
-            destination_ports.add(so.destination_port)
 
-        # R08: validate destination port consistency
-        if len(destination_ports) > 1:
+        # Determine destination port
+        if data.destination_port:
+            destination_port = data.destination_port
+        elif destination_ports:
+            destination_port = destination_ports.pop()
+        else:
             raise BusinessError(
-                code=42253,
-                message=f"合柜的销售订单目的港不一致: {', '.join(destination_ports)}",
+                code=42261,
+                message="未关联销售订单时，必须手动指定目的港",
             )
-
-        destination_port = data.destination_port or destination_ports.pop()
 
         seq = await self.repo.count_by_date(date.today()) + 1
         plan_no = generate_order_no("CL", date.today(), seq)
@@ -92,8 +104,9 @@ class ContainerService:
         )
         plan = await self.repo.create(plan)
 
-        # Link sales orders
-        await self.repo.link_sales_orders(plan.id, data.sales_order_ids)
+        # Link sales orders if provided
+        if data.sales_order_ids:
+            await self.repo.link_sales_orders(plan.id, data.sales_order_ids)
 
         plan_id = plan.id
         self.db.expire(plan)
@@ -158,39 +171,85 @@ class ContainerService:
                 message=f"柜序号 {data.container_seq} 超过柜数量 {plan.container_count}",
             )
 
-        # R05: Check inventory availability
-        available = await self.inventory_repo.get_available_quantity(
-            data.product_id, data.sales_order_id
-        )
-        # Subtract already allocated to other container items for this product+SO
-        existing_items = await self.repo.get_items_by_plan(plan_id)
-        already_allocated = sum(
-            item.quantity
-            for item in existing_items
-            if item.product_id == data.product_id and item.sales_order_id == data.sales_order_id
-        )
-        actual_available = available - already_allocated
-        if data.quantity > actual_available:
+        product_id = data.product_id
+        sales_order_id = data.sales_order_id
+        inventory_record_id = data.inventory_record_id
+
+        # If inventory_record_id provided, use batch-driven mode
+        if inventory_record_id:
+            inv = await self.inventory_repo.get_by_id(inventory_record_id)
+            if not inv:
+                raise NotFoundError("库存记录", str(inventory_record_id))
+
+            # Derive product_id and sales_order_id from inventory record
+            product_id = inv.product_id
+            sales_order_id = inv.sales_order_id
+
+            # Check available quantity for this specific batch
+            existing_items = await self.repo.get_items_by_plan(plan_id)
+            already_allocated = sum(
+                item.quantity
+                for item in existing_items
+                if item.inventory_record_id == inventory_record_id
+            )
+            actual_available = inv.available_quantity - already_allocated
+            if data.quantity > actual_available:
+                raise BusinessError(
+                    code=42260,
+                    message=f"批次库存不足：可用 {actual_available}，请求 {data.quantity}",
+                    detail={
+                        "inventory_record_id": str(inventory_record_id),
+                        "available": actual_available,
+                        "requested": data.quantity,
+                    },
+                )
+        elif product_id and sales_order_id:
+            # Legacy mode: check by product + sales_order
+            available = await self.inventory_repo.get_available_quantity(
+                product_id, sales_order_id
+            )
+            existing_items = await self.repo.get_items_by_plan(plan_id)
+            already_allocated = sum(
+                item.quantity
+                for item in existing_items
+                if item.product_id == product_id and item.sales_order_id == sales_order_id
+            )
+            actual_available = available - already_allocated
+            if data.quantity > actual_available:
+                raise BusinessError(
+                    code=42260,
+                    message=f"库存不足：可用 {actual_available}，请求 {data.quantity}",
+                    detail={
+                        "product_id": str(product_id),
+                        "available": actual_available,
+                        "requested": data.quantity,
+                    },
+                )
+        else:
             raise BusinessError(
-                code=42260,
-                message=f"库存不足：可用 {actual_available}，请求 {data.quantity}",
-                detail={
-                    "product_id": str(data.product_id),
-                    "available": actual_available,
-                    "requested": data.quantity,
-                },
+                code=42262,
+                message="必须提供 inventory_record_id 或 product_id + sales_order_id",
             )
 
         item = ContainerPlanItem(
             container_plan_id=plan_id,
             container_seq=data.container_seq,
-            product_id=data.product_id,
-            sales_order_id=data.sales_order_id,
+            product_id=product_id,
+            sales_order_id=sales_order_id,
+            inventory_record_id=inventory_record_id,
             quantity=data.quantity,
             volume_cbm=data.volume_cbm,
             weight_kg=data.weight_kg,
         )
-        return await self.repo.add_item(item)
+        created_item = await self.repo.add_item(item)
+
+        # Auto-sync M2M table if sales_order_id is set
+        if sales_order_id:
+            existing_so_ids = await self.repo.get_linked_so_ids(plan_id)
+            if sales_order_id not in existing_so_ids:
+                await self.repo.link_sales_orders(plan_id, [sales_order_id])
+
+        return created_item
 
     async def update_item(
         self, plan_id: uuid.UUID, item_id: uuid.UUID, data: ContainerPlanItemUpdate
@@ -386,7 +445,7 @@ class ContainerService:
     # ==================== Confirm & Stuffing ====================
 
     async def confirm(self, plan_id: uuid.UUID, user_id: uuid.UUID) -> ContainerPlan:
-        """R12: Confirm plan → update linked SOs to container_planned."""
+        """R12: Confirm plan → lock inventory → update linked SOs."""
         plan = await self.get_by_id(plan_id)
         if plan.status != ContainerPlanStatus.PLANNING:
             raise BusinessError(code=42256, message="只有规划中的排柜计划可以确认")
@@ -400,6 +459,25 @@ class ContainerService:
                 detail={"errors": validation.errors},
             )
 
+        # Lock inventory: reserve for each item with inventory_record_id
+        items = await self.repo.get_items_by_plan(plan_id)
+        for item in items:
+            if item.inventory_record_id:
+                await self.inventory_repo.reserve(item.inventory_record_id, item.quantity)
+
+            # Update SalesOrderItem.reserved_quantity
+            if item.sales_order_id:
+                so_item_result = await self.db.execute(
+                    select(SalesOrderItem).where(
+                        SalesOrderItem.sales_order_id == item.sales_order_id,
+                        SalesOrderItem.product_id == item.product_id,
+                    )
+                )
+                so_item = so_item_result.scalar_one_or_none()
+                if so_item:
+                    so_item.reserved_quantity += item.quantity
+                    await self.db.flush()
+
         plan.status = ContainerPlanStatus.CONFIRMED
         plan.updated_by = user_id
         await self.db.flush()
@@ -407,10 +485,64 @@ class ContainerService:
         # R12: update linked SOs to container_planned
         so_ids = await self.repo.get_linked_so_ids(plan_id)
         for so_id in so_ids:
-            result = await self.db.execute(select(SalesOrder).where(SalesOrder.id == so_id))
+            result = await self.db.execute(
+                select(SalesOrder)
+                .options(selectinload(SalesOrder.items))
+                .where(SalesOrder.id == so_id)
+            )
             so = result.scalar_one_or_none()
             if so and so.status == SalesOrderStatus.GOODS_READY:
-                so.status = SalesOrderStatus.CONTAINER_PLANNED
+                # Check if all items are fully reserved
+                all_reserved = all(
+                    so_item.reserved_quantity >= so_item.quantity for so_item in so.items
+                )
+                if all_reserved:
+                    so.status = SalesOrderStatus.CONTAINER_PLANNED
+                    await self.db.flush()
+
+        plan_id_val = plan.id
+        self.db.expire(plan)
+        return await self.get_by_id(plan_id_val)
+
+    async def cancel_plan(self, plan_id: uuid.UUID, user_id: uuid.UUID) -> ContainerPlan:
+        """Cancel a confirmed plan → release inventory reservations."""
+        plan = await self.get_by_id(plan_id)
+        if plan.status != ContainerPlanStatus.CONFIRMED:
+            raise BusinessError(code=42263, message="只有已确认状态的排柜计划可以取消")
+
+        # Release inventory reservations
+        items = await self.repo.get_items_by_plan(plan_id)
+        for item in items:
+            if item.inventory_record_id:
+                await self.inventory_repo.release_reservation(
+                    item.inventory_record_id, item.quantity
+                )
+
+            # Rollback SalesOrderItem.reserved_quantity
+            if item.sales_order_id:
+                so_item_result = await self.db.execute(
+                    select(SalesOrderItem).where(
+                        SalesOrderItem.sales_order_id == item.sales_order_id,
+                        SalesOrderItem.product_id == item.product_id,
+                    )
+                )
+                so_item = so_item_result.scalar_one_or_none()
+                if so_item:
+                    so_item.reserved_quantity = max(0, so_item.reserved_quantity - item.quantity)
+                    await self.db.flush()
+
+        # Revert plan status
+        plan.status = ContainerPlanStatus.PLANNING
+        plan.updated_by = user_id
+        await self.db.flush()
+
+        # Rollback SO status if applicable
+        so_ids = await self.repo.get_linked_so_ids(plan_id)
+        for so_id in so_ids:
+            result = await self.db.execute(select(SalesOrder).where(SalesOrder.id == so_id))
+            so = result.scalar_one_or_none()
+            if so and so.status == SalesOrderStatus.CONTAINER_PLANNED:
+                so.status = SalesOrderStatus.GOODS_READY
                 await self.db.flush()
 
         plan_id_val = plan.id

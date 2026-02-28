@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import { PageContainer, ProTable, type ActionType, type ProColumns } from '@ant-design/pro-components';
 import { Tabs, Tag, Alert, Space, Button, Table } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
-import { listInventory, getInventoryByOrder, checkReadiness, listPendingInspection } from '@/api/warehouse';
+import { listInventory, getInventoryByOrder, checkReadiness, listPendingInspection, listInventoryBatches } from '@/api/warehouse';
 import { listSalesOrders } from '@/api/salesOrders';
 import { InspectionResultLabels, InspectionResultColors } from '@/types/api';
-import type { InventoryByProductRead, InventoryByOrderRead, ReceivingNoteItemRead, ReadinessCheckResponse } from '@/types/models';
+import type { InventoryByProductRead, InventoryByOrderRead, InventoryBatchRead, ReceivingNoteItemRead, ReadinessCheckResponse } from '@/types/models';
 import { formatDate } from '@/utils/format';
 import { useExport } from '@/hooks/useExport';
 import PermissionButton from '@/components/PermissionButton';
@@ -86,6 +86,53 @@ function ByOrderTab() {
   );
 }
 
+function BatchDetailTab() {
+  const [batches, setBatches] = useState<InventoryBatchRead[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleLoad = async () => {
+    setLoading(true);
+    try {
+      const data = await listInventoryBatches({ page_size: 200 });
+      setBatches(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <Button type="primary" onClick={handleLoad} loading={loading} style={{ marginBottom: 16 }}>
+        加载批次明细
+      </Button>
+      <Table<InventoryBatchRead>
+        dataSource={batches}
+        rowKey="id"
+        loading={loading}
+        pagination={{ pageSize: 20 }}
+        columns={[
+          { title: '商品名称', dataIndex: 'product_name', width: 150, ellipsis: true },
+          { title: '关联订单', dataIndex: 'sales_order_no', width: 140 },
+          { title: '批次号', dataIndex: 'batch_no', width: 130 },
+          { title: '生产日期', dataIndex: 'production_date', width: 110, render: (v) => formatDate(v as string) },
+          { title: '总量', dataIndex: 'quantity', width: 80 },
+          { title: '预留量', dataIndex: 'reserved_quantity', width: 80 },
+          { title: '可用量', dataIndex: 'available_quantity', width: 80 },
+          {
+            title: '保质期剩余',
+            dataIndex: 'shelf_life_remaining_days',
+            width: 100,
+            render: (v: number | null) =>
+              v !== null ? (
+                <Tag color={v < 90 ? 'red' : v < 180 ? 'orange' : 'green'}>{v}天</Tag>
+              ) : '-',
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
 export default function InventoryPage() {
   const actionRef = useRef<ActionType>();
   const inspectionActionRef = useRef<ActionType>();
@@ -94,6 +141,7 @@ export default function InventoryPage() {
   const productColumns: ProColumns<InventoryByProductRead>[] = [
     { title: '商品ID', dataIndex: 'product_id', ellipsis: true },
     { title: '总数量', dataIndex: 'total_quantity', width: 100 },
+    { title: '已预留', dataIndex: 'reserved_quantity', width: 100 },
     { title: '可用数量', dataIndex: 'available_quantity', width: 100 },
     {
       title: '状态',
@@ -170,6 +218,11 @@ export default function InventoryPage() {
             key: 'by-order',
             label: '按订单查看',
             children: <ByOrderTab />,
+          },
+          {
+            key: 'batch-detail',
+            label: '库存批次明细',
+            children: <BatchDetailTab />,
           },
           {
             key: 'pending-inspection',

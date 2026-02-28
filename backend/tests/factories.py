@@ -127,11 +127,11 @@ def make_receiving_note_data(
 
 
 def make_container_plan_data(
-    sales_order_ids: list[str],
+    sales_order_ids: list[str] | None = None,
     **overrides,
 ) -> dict:
     defaults = {
-        "sales_order_ids": sales_order_ids,
+        "sales_order_ids": sales_order_ids or [],
         "container_type": ContainerType.HQ40.value,
         "container_count": 1,
     }

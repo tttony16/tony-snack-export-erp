@@ -95,6 +95,7 @@ class InventoryRecordRead(BaseModel):
     batch_no: str
     production_date: date
     quantity: int
+    reserved_quantity: int = 0
     available_quantity: int
     created_at: datetime | None = None
 
@@ -104,6 +105,7 @@ class InventoryRecordRead(BaseModel):
 class InventoryByProductRead(BaseModel):
     product_id: uuid.UUID
     total_quantity: int
+    reserved_quantity: int = 0
     available_quantity: int
 
 
@@ -122,6 +124,20 @@ class InventoryListParams(BaseModel):
     page_size: int = Field(default=20, ge=1, le=100)
     sort_by: str = "created_at"
     sort_order: str = Field(default="desc", pattern="^(asc|desc)$")
+
+
+class InventoryBatchRead(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str | None = None
+    sales_order_id: uuid.UUID | None
+    sales_order_no: str | None = None
+    batch_no: str
+    production_date: date
+    quantity: int
+    reserved_quantity: int = 0
+    available_quantity: int
+    shelf_life_remaining_days: int | None = None
 
 
 class ReadinessCheckResponse(BaseModel):

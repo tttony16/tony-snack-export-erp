@@ -39,6 +39,10 @@ def _build_plan_read(plan) -> ContainerPlanRead:
         if isinstance(stuffing, list)
         else []
     )
+    item_reads = []
+    for i in plan.items:
+        item_data = ContainerPlanItemRead.model_validate(i)
+        item_reads.append(item_data)
     return ContainerPlanRead(
         id=plan.id,
         plan_no=plan.plan_no,
@@ -47,7 +51,7 @@ def _build_plan_read(plan) -> ContainerPlanRead:
         destination_port=plan.destination_port,
         status=plan.status,
         remark=plan.remark,
-        items=[ContainerPlanItemRead.model_validate(i) for i in plan.items],
+        items=item_reads,
         linked_sales_order_ids=so_ids,
         stuffing_records=stuffing_list,
         created_at=str(plan.created_at) if plan.created_at else None,
@@ -200,6 +204,17 @@ async def confirm_container_plan(
 ):
     service = ContainerService(db)
     plan = await service.confirm(id, user.id)
+    return ApiResponse(data=_build_plan_read(plan))
+
+
+@router.post("/{id}/cancel", response_model=ApiResponse[ContainerPlanRead])
+async def cancel_container_plan(
+    id: uuid.UUID,
+    user: User = Depends(require_permission(Permission.CONTAINER_CONFIRM)),
+    db: AsyncSession = Depends(get_db),
+):
+    service = ContainerService(db)
+    plan = await service.cancel_plan(id, user.id)
     return ApiResponse(data=_build_plan_read(plan))
 
 

@@ -313,6 +313,25 @@ export const LogisticsCostTypeLabels: Record<LogisticsCostType, string> = {
   other: '其他',
 };
 
+export const OutboundOrderStatus = {
+  draft: 'draft',
+  confirmed: 'confirmed',
+  cancelled: 'cancelled',
+} as const;
+export type OutboundOrderStatus = (typeof OutboundOrderStatus)[keyof typeof OutboundOrderStatus];
+
+export const OutboundOrderStatusLabels: Record<OutboundOrderStatus, string> = {
+  draft: '草稿',
+  confirmed: '已确认',
+  cancelled: '已取消',
+};
+
+export const OutboundOrderStatusColors: Record<OutboundOrderStatus, string> = {
+  draft: 'default',
+  confirmed: 'green',
+  cancelled: 'red',
+};
+
 export const AuditAction = {
   create: 'create',
   update: 'update',

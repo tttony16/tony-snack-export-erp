@@ -10,6 +10,7 @@ import {
   ShoppingCartOutlined,
   InboxOutlined,
   ContainerOutlined,
+  ExportOutlined,
   SendOutlined,
   BarChartOutlined,
   SettingOutlined,
@@ -38,6 +39,7 @@ const allMenus: (MenuDataItem & { permission?: string })[] = [
     ],
   },
   { path: '/containers', name: '排柜管理', icon: <ContainerOutlined />, permission: 'container:view' },
+  { path: '/outbound', name: '出库管理', icon: <ExportOutlined />, permission: 'outbound:view' },
   { path: '/logistics', name: '物流管理', icon: <SendOutlined />, permission: 'logistics:view' },
   { path: '/statistics', name: '统计报表', icon: <BarChartOutlined />, permission: 'statistics:view' },
   {

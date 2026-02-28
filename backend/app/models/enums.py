@@ -114,6 +114,12 @@ class LogisticsCostType(str, enum.Enum):
     OTHER = "other"
 
 
+class OutboundOrderStatus(str, enum.Enum):
+    DRAFT = "draft"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+
+
 class AuditAction(str, enum.Enum):
     CREATE = "create"
     UPDATE = "update"

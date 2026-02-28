@@ -8,6 +8,7 @@ export * from './salesOrders';
 export * from './purchaseOrders';
 export * from './warehouse';
 export * from './containers';
+export * from './outbound';
 export * from './logistics';
 export * from './dashboard';
 export { getSalesSummary, getPurchaseSummary, getCustomerRanking, getProductRanking } from './statistics';

@@ -17,6 +17,8 @@ const ReceivingNotes = lazy(() => import('@/pages/warehouse/receiving-notes'));
 const Inventory = lazy(() => import('@/pages/warehouse/inventory'));
 const Containers = lazy(() => import('@/pages/containers'));
 const ContainerDetail = lazy(() => import('@/pages/containers/ContainerDetail'));
+const OutboundOrders = lazy(() => import('@/pages/outbound'));
+const OutboundDetail = lazy(() => import('@/pages/outbound/OutboundDetail'));
 const Logistics = lazy(() => import('@/pages/logistics'));
 const LogisticsDetail = lazy(() => import('@/pages/logistics/LogisticsDetail'));
 const SystemUsers = lazy(() => import('@/pages/system/users'));
@@ -52,6 +54,8 @@ export default function App() {
           <Route path="warehouse/inventory" element={<Inventory />} />
           <Route path="containers" element={<Containers />} />
           <Route path="containers/:id" element={<ContainerDetail />} />
+          <Route path="outbound" element={<OutboundOrders />} />
+          <Route path="outbound/:id" element={<OutboundDetail />} />
           <Route path="logistics" element={<Logistics />} />
           <Route path="logistics/:id" element={<LogisticsDetail />} />
           <Route path="system/users" element={<SystemUsers />} />

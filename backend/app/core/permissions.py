@@ -33,6 +33,10 @@ class Permission(str, Enum):
     CONTAINER_CONFIRM = "container:confirm"
     CONTAINER_STUFFING = "container:stuffing"
     PACKING_LIST_EXPORT = "packing_list:export"
+    # 出库
+    OUTBOUND_VIEW = "outbound:view"
+    OUTBOUND_EDIT = "outbound:edit"
+    OUTBOUND_CONFIRM = "outbound:confirm"
     # 物流
     LOGISTICS_VIEW = "logistics:view"
     LOGISTICS_EDIT = "logistics:edit"
@@ -66,6 +70,9 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         Permission.CONTAINER_CONFIRM,
         Permission.CONTAINER_STUFFING,
         Permission.PACKING_LIST_EXPORT,
+        Permission.OUTBOUND_VIEW,
+        Permission.OUTBOUND_EDIT,
+        Permission.OUTBOUND_CONFIRM,
         Permission.LOGISTICS_VIEW,
         Permission.LOGISTICS_EDIT,
         Permission.AUDIT_LOG_VIEW,
@@ -102,6 +109,9 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         Permission.CONTAINER_VIEW,
         Permission.CONTAINER_STUFFING,
         Permission.PACKING_LIST_EXPORT,
+        Permission.OUTBOUND_VIEW,
+        Permission.OUTBOUND_EDIT,
+        Permission.OUTBOUND_CONFIRM,
     },
     "viewer": {
         Permission.PRODUCT_VIEW,
@@ -111,6 +121,7 @@ ROLE_PERMISSIONS: dict[str, set[Permission]] = {
         Permission.PURCHASE_ORDER_VIEW,
         Permission.INVENTORY_VIEW,
         Permission.CONTAINER_VIEW,
+        Permission.OUTBOUND_VIEW,
         Permission.LOGISTICS_VIEW,
     },
 }

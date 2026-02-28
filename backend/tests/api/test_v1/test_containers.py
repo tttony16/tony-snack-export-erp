@@ -226,11 +226,25 @@ class TestConfirmContainerPlan:
     async def test_confirm_r12(
         self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
     ):
-        """R12: Confirm plan → SO status becomes container_planned."""
+        """R12: Confirm plan with all SO items reserved → SO status becomes container_planned."""
         headers = get_auth_headers(admin_user)
         data = make_container_plan_data([seed_goods_ready_so["so_id"]])
         create_resp = await client.post("/api/v1/containers", json=data, headers=headers)
         plan_id = create_resp.json()["data"]["id"]
+
+        # Get inventory batch and add item covering full SO quantity
+        batch_resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches = batch_resp.json()["data"]
+        batch = next(b for b in batches if b["product_id"] == seed_goods_ready_so["product_id"])
+
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": 100,  # Full SO quantity
+            "volume_cbm": "3.0",
+            "weight_kg": "1000.0",
+        }
+        await client.post(f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers)
 
         resp = await client.post(f"/api/v1/containers/{plan_id}/confirm", headers=headers)
         assert resp.status_code == 200
@@ -256,6 +270,187 @@ class TestConfirmContainerPlan:
         assert resp.status_code == 422
 
 
+class TestCreateContainerPlanWithoutSO:
+    async def test_create_without_so_with_destination_port(
+        self, client: AsyncClient, admin_user: User
+    ):
+        """Creating a plan without SO is allowed if destination_port is provided."""
+        headers = get_auth_headers(admin_user)
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["data"]["destination_port"] == "Bangkok Port"
+
+    async def test_create_without_so_no_port_fails(
+        self, client: AsyncClient, admin_user: User
+    ):
+        """Creating a plan without SO and without destination_port fails."""
+        headers = get_auth_headers(admin_user)
+        data = make_container_plan_data()
+        resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        assert resp.status_code == 422
+
+
+class TestContainerBatchItems:
+    async def test_add_item_by_batch(
+        self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
+    ):
+        """Add item using inventory_record_id (batch-driven mode)."""
+        headers = get_auth_headers(admin_user)
+
+        # Get available batches
+        resp = await client.get(
+            "/api/v1/warehouse/inventory/batches",
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        batches = resp.json()["data"]
+        assert len(batches) > 0
+        batch = batches[0]
+
+        # Create plan without SO (since we have a batch to use)
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        plan_resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        plan_id = plan_resp.json()["data"]["id"]
+
+        # Add item using inventory_record_id
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": min(10, batch["available_quantity"]),
+            "volume_cbm": "0.5",
+            "weight_kg": "100.0",
+        }
+        resp = await client.post(
+            f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers
+        )
+        assert resp.status_code == 201
+
+    async def test_add_item_exceeds_batch_available(
+        self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
+    ):
+        """Cannot allocate more than available in batch."""
+        headers = get_auth_headers(admin_user)
+
+        resp = await client.get(
+            "/api/v1/warehouse/inventory/batches",
+            headers=headers,
+        )
+        batches = resp.json()["data"]
+        assert len(batches) > 0
+        batch = batches[0]
+
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        plan_resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        plan_id = plan_resp.json()["data"]["id"]
+
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": batch["available_quantity"] + 999,
+            "volume_cbm": "0.5",
+            "weight_kg": "100.0",
+        }
+        resp = await client.post(
+            f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers
+        )
+        assert resp.status_code == 422
+
+
+class TestConfirmContainerPlanInventoryLock:
+    async def test_confirm_reserves_inventory(
+        self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
+    ):
+        """Confirming plan should reserve (lock) inventory."""
+        headers = get_auth_headers(admin_user)
+
+        # Get batch for allocation
+        resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches = resp.json()["data"]
+        batch = batches[0]
+        available_before = batch["available_quantity"]
+
+        # Create plan and add item
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        plan_resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        plan_id = plan_resp.json()["data"]["id"]
+
+        alloc_qty = min(10, available_before)
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": alloc_qty,
+            "volume_cbm": "0.5",
+            "weight_kg": "100.0",
+        }
+        await client.post(f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers)
+
+        # Confirm → should reserve inventory
+        await client.post(f"/api/v1/containers/{plan_id}/confirm", headers=headers)
+
+        # Check inventory batch - available should be reduced
+        resp2 = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches2 = resp2.json()["data"]
+        updated_batch = next((b for b in batches2 if b["id"] == batch["id"]), None)
+        assert updated_batch is not None
+        assert updated_batch["available_quantity"] == available_before - alloc_qty
+        assert updated_batch["reserved_quantity"] >= alloc_qty
+
+
+class TestCancelContainerPlan:
+    async def test_cancel_releases_inventory(
+        self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
+    ):
+        """Cancelling a confirmed plan should release inventory reservations."""
+        headers = get_auth_headers(admin_user)
+
+        resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches = resp.json()["data"]
+        batch = batches[0]
+        available_before = batch["available_quantity"]
+
+        # Create, add item, confirm
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        plan_resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        plan_id = plan_resp.json()["data"]["id"]
+
+        alloc_qty = min(10, available_before)
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": alloc_qty,
+            "volume_cbm": "0.5",
+            "weight_kg": "100.0",
+        }
+        await client.post(f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers)
+        await client.post(f"/api/v1/containers/{plan_id}/confirm", headers=headers)
+
+        # Cancel → should release
+        resp_cancel = await client.post(f"/api/v1/containers/{plan_id}/cancel", headers=headers)
+        assert resp_cancel.status_code == 200
+        assert resp_cancel.json()["data"]["status"] == "planning"
+
+        # Check inventory restored
+        resp3 = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches3 = resp3.json()["data"]
+        restored_batch = next((b for b in batches3 if b["id"] == batch["id"]), None)
+        assert restored_batch is not None
+        assert restored_batch["available_quantity"] == available_before
+
+    async def test_cancel_non_confirmed_fails(
+        self, client: AsyncClient, admin_user: User
+    ):
+        """Only CONFIRMED plans can be cancelled."""
+        headers = get_auth_headers(admin_user)
+        data = make_container_plan_data(destination_port="Bangkok Port")
+        plan_resp = await client.post("/api/v1/containers", json=data, headers=headers)
+        plan_id = plan_resp.json()["data"]["id"]
+
+        resp = await client.post(f"/api/v1/containers/{plan_id}/cancel", headers=headers)
+        assert resp.status_code == 422
+
+
 class TestStuffing:
     async def test_stuffing_r13(
         self, client: AsyncClient, admin_user: User, seed_goods_ready_so: dict
@@ -266,7 +461,20 @@ class TestStuffing:
         create_resp = await client.post("/api/v1/containers", json=data, headers=headers)
         plan_id = create_resp.json()["data"]["id"]
 
-        # Confirm plan first
+        # Add item covering full SO quantity using batch mode
+        batch_resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        batches = batch_resp.json()["data"]
+        batch = next(b for b in batches if b["product_id"] == seed_goods_ready_so["product_id"])
+        item_data = {
+            "container_seq": 1,
+            "inventory_record_id": batch["id"],
+            "quantity": 100,
+            "volume_cbm": "3.0",
+            "weight_kg": "1000.0",
+        }
+        await client.post(f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers)
+
+        # Confirm plan first (reserves inventory, transitions SO to container_planned)
         await client.post(f"/api/v1/containers/{plan_id}/confirm", headers=headers)
 
         # Record stuffing for the single container

@@ -84,8 +84,11 @@ class ContainerPlanItem(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id"), nullable=False
     )
-    sales_order_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("sales_orders.id"), nullable=False
+    sales_order_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sales_orders.id"), nullable=True
+    )
+    inventory_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("inventory_records.id"), nullable=True
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     volume_cbm: Mapped[float] = mapped_column(Numeric(10, 4), nullable=False)

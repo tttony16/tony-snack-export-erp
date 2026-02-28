@@ -83,10 +83,24 @@ async def seed_loaded_plan(client: AsyncClient, admin_user: User) -> dict:
     )
     await client.post("/api/v1/warehouse/receiving-notes", json=rcv_data, headers=headers)
 
-    # Create container plan → confirm → stuff → loaded
+    # Create container plan → add batch item → confirm → stuff → loaded
     plan_data = make_container_plan_data([so_id])
     plan_resp = await client.post("/api/v1/containers", json=plan_data, headers=headers)
     plan_id = plan_resp.json()["data"]["id"]
+
+    # Add item using batch mode to cover full SO quantity
+    batch_resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+    batches = batch_resp.json()["data"]
+    batch = next(b for b in batches if b["product_id"] == product_id)
+    item_data = {
+        "container_seq": 1,
+        "inventory_record_id": batch["id"],
+        "quantity": 100,
+        "volume_cbm": "3.0",
+        "weight_kg": "1000.0",
+    }
+    await client.post(f"/api/v1/containers/{plan_id}/items", json=item_data, headers=headers)
+
     await client.post(f"/api/v1/containers/{plan_id}/confirm", headers=headers)
 
     stuffing_data = {

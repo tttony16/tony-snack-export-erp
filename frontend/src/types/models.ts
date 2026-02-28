@@ -7,6 +7,7 @@ import type {
   ContainerType,
   LogisticsStatus,
   LogisticsCostType,
+  OutboundOrderStatus,
   UserRole,
   CurrencyType,
   PaymentMethod,
@@ -318,6 +319,8 @@ export interface SalesOrderItemRead {
   amount: number;
   purchased_quantity: number;
   received_quantity: number;
+  reserved_quantity: number;
+  outbound_quantity: number;
   created_at: string;
   updated_at: string;
 }
@@ -581,6 +584,7 @@ export interface InventoryRecordRead {
   batch_no: string;
   production_date: string;
   quantity: number;
+  reserved_quantity: number;
   available_quantity: number;
   created_at: string | null;
 }
@@ -588,7 +592,22 @@ export interface InventoryRecordRead {
 export interface InventoryByProductRead {
   product_id: string;
   total_quantity: number;
+  reserved_quantity: number;
   available_quantity: number;
+}
+
+export interface InventoryBatchRead {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  sales_order_id: string | null;
+  sales_order_no: string | null;
+  batch_no: string;
+  production_date: string;
+  quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
+  shelf_life_remaining_days: number | null;
 }
 
 export interface InventoryByOrderRead {
@@ -618,8 +637,9 @@ export interface ReadinessCheckResponse {
 
 export interface ContainerPlanItemCreate {
   container_seq: number;
-  product_id: string;
-  sales_order_id: string;
+  product_id?: string;
+  sales_order_id?: string;
+  inventory_record_id?: string;
   quantity: number;
   volume_cbm: number;
   weight_kg: number;
@@ -630,10 +650,13 @@ export interface ContainerPlanItemRead {
   container_plan_id: string;
   container_seq: number;
   product_id: string;
-  sales_order_id: string;
+  sales_order_id: string | null;
+  inventory_record_id: string | null;
   quantity: number;
   volume_cbm: number;
   weight_kg: number;
+  batch_no: string | null;
+  production_date: string | null;
 }
 
 export interface ContainerPlanItemUpdate {
@@ -644,7 +667,7 @@ export interface ContainerPlanItemUpdate {
 }
 
 export interface ContainerPlanCreate {
-  sales_order_ids: string[];
+  sales_order_ids?: string[];
   container_type: ContainerType;
   container_count?: number;
   destination_port?: string;
@@ -757,6 +780,61 @@ export interface ContainerValidationResponse {
   is_valid: boolean;
   errors: Record<string, unknown>[];
   warnings: Record<string, unknown>[];
+}
+
+// ===== Outbound =====
+
+export interface OutboundOrderItemRead {
+  id: string;
+  outbound_order_id: string;
+  container_plan_item_id: string | null;
+  inventory_record_id: string;
+  product_id: string;
+  sales_order_id: string | null;
+  quantity: number;
+  batch_no: string;
+  production_date: string;
+}
+
+export interface OutboundOrderCreate {
+  container_plan_id: string;
+}
+
+export interface OutboundOrderConfirm {
+  outbound_date: string;
+  operator: string;
+}
+
+export interface OutboundOrderRead {
+  id: string;
+  order_no: string;
+  container_plan_id: string;
+  status: OutboundOrderStatus;
+  outbound_date: string | null;
+  operator: string | null;
+  remark: string | null;
+  items: OutboundOrderItemRead[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface OutboundOrderListRead {
+  id: string;
+  order_no: string;
+  container_plan_id: string;
+  status: OutboundOrderStatus;
+  outbound_date: string | null;
+  operator: string | null;
+  created_at: string | null;
+}
+
+export interface OutboundOrderListParams {
+  status?: OutboundOrderStatus;
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 // ===== Logistics =====

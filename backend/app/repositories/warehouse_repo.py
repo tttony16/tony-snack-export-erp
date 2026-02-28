@@ -85,6 +85,7 @@ class InventoryRepository(BaseRepository[InventoryRecord]):
         query = select(
             InventoryRecord.product_id,
             func.sum(InventoryRecord.quantity).label("total_quantity"),
+            func.sum(InventoryRecord.reserved_quantity).label("reserved_quantity"),
             func.sum(InventoryRecord.available_quantity).label("available_quantity"),
         ).group_by(InventoryRecord.product_id)
         count_query = select(func.count()).select_from(
@@ -104,6 +105,7 @@ class InventoryRepository(BaseRepository[InventoryRecord]):
             {
                 "product_id": row.product_id,
                 "total_quantity": row.total_quantity,
+                "reserved_quantity": row.reserved_quantity,
                 "available_quantity": row.available_quantity,
             }
             for row in rows
@@ -144,6 +146,64 @@ class InventoryRepository(BaseRepository[InventoryRecord]):
             )
         )
         return result.scalar_one()
+
+    async def get_available_batches(
+        self,
+        *,
+        product_id: uuid.UUID | None = None,
+        sales_order_id: uuid.UUID | None = None,
+        destination_port: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[InventoryRecord], int]:
+        """Return available inventory batches for container allocation."""
+        filters = [InventoryRecord.available_quantity > 0]
+        if product_id:
+            filters.append(InventoryRecord.product_id == product_id)
+        if sales_order_id:
+            filters.append(InventoryRecord.sales_order_id == sales_order_id)
+        return await self.get_list(
+            offset=offset,
+            limit=limit,
+            order_by="production_date",
+            order_desc=False,
+            filters=filters,
+        )
+
+    async def reserve(self, inventory_record_id: uuid.UUID, quantity: int) -> None:
+        """Atomically reserve inventory: reserved_quantity += qty, available_quantity -= qty."""
+        record = await self.get_by_id(inventory_record_id)
+        if not record:
+            raise ValueError(f"Inventory record {inventory_record_id} not found")
+        if record.available_quantity < quantity:
+            raise ValueError(
+                f"Insufficient available quantity: {record.available_quantity} < {quantity}"
+            )
+        record.reserved_quantity += quantity
+        record.available_quantity -= quantity
+        await self.db.flush()
+
+    async def release_reservation(self, inventory_record_id: uuid.UUID, quantity: int) -> None:
+        """Release reserved inventory: reserved_quantity -= qty, available_quantity += qty."""
+        record = await self.get_by_id(inventory_record_id)
+        if not record:
+            raise ValueError(f"Inventory record {inventory_record_id} not found")
+        record.reserved_quantity -= quantity
+        record.available_quantity += quantity
+        await self.db.flush()
+
+    async def deduct(self, inventory_record_id: uuid.UUID, quantity: int) -> None:
+        """Deduct inventory on outbound: quantity -= qty, reserved_quantity -= qty."""
+        record = await self.get_by_id(inventory_record_id)
+        if not record:
+            raise ValueError(f"Inventory record {inventory_record_id} not found")
+        if record.reserved_quantity < quantity:
+            raise ValueError(
+                f"Insufficient reserved quantity: {record.reserved_quantity} < {quantity}"
+            )
+        record.quantity -= quantity
+        record.reserved_quantity -= quantity
+        await self.db.flush()
 
     async def search(
         self,

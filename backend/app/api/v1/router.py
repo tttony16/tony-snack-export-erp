@@ -6,6 +6,7 @@ from app.api.v1 import (
     customers,
     dashboard,
     logistics,
+    outbound,
     product_categories,
     products,
     purchase_orders,
@@ -27,6 +28,7 @@ api_router.include_router(sales_orders.router)
 api_router.include_router(purchase_orders.router)
 api_router.include_router(warehouse.router)
 api_router.include_router(containers.router)
+api_router.include_router(outbound.router)
 api_router.include_router(logistics.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(statistics.router)

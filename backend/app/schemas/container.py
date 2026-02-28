@@ -10,8 +10,9 @@ from app.models.enums import ContainerPlanStatus, ContainerType
 # --- Container Plan Item ---
 class ContainerPlanItemCreate(BaseModel):
     container_seq: int = Field(ge=1)
-    product_id: uuid.UUID
-    sales_order_id: uuid.UUID
+    product_id: uuid.UUID | None = None
+    sales_order_id: uuid.UUID | None = None
+    inventory_record_id: uuid.UUID | None = None
     quantity: int = Field(gt=0)
     volume_cbm: Decimal = Field(ge=0)
     weight_kg: Decimal = Field(ge=0)
@@ -22,10 +23,13 @@ class ContainerPlanItemRead(BaseModel):
     container_plan_id: uuid.UUID
     container_seq: int
     product_id: uuid.UUID
-    sales_order_id: uuid.UUID
+    sales_order_id: uuid.UUID | None
+    inventory_record_id: uuid.UUID | None
     quantity: int
     volume_cbm: Decimal
     weight_kg: Decimal
+    batch_no: str | None = None
+    production_date: date | None = None
 
     model_config = {"from_attributes": True}
 
@@ -39,7 +43,7 @@ class ContainerPlanItemUpdate(BaseModel):
 
 # --- Container Plan ---
 class ContainerPlanCreate(BaseModel):
-    sales_order_ids: list[uuid.UUID] = Field(min_length=1)
+    sales_order_ids: list[uuid.UUID] = Field(default_factory=list)
     container_type: ContainerType
     container_count: int = Field(default=1, ge=1)
     destination_port: str | None = None

@@ -97,5 +97,7 @@ class SalesOrderItem(Base):
     amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
     purchased_quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     received_quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    reserved_quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    outbound_quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     sales_order: Mapped["SalesOrder"] = relationship(back_populates="items")

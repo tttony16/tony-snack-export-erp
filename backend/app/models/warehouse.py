@@ -72,4 +72,5 @@ class InventoryRecord(Base):
     batch_no: Mapped[str] = mapped_column(String(50), nullable=False)
     production_date: Mapped[date] = mapped_column(Date, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    reserved_quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     available_quantity: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -61,6 +61,10 @@ export async function confirmContainerPlan(id: string): Promise<ContainerPlanRea
   return request.post(`/containers/${id}/confirm`);
 }
 
+export async function cancelContainerPlan(id: string): Promise<ContainerPlanRead> {
+  return request.post(`/containers/${id}/cancel`);
+}
+
 export async function recordStuffing(id: string, data: ContainerStuffingCreate): Promise<ContainerStuffingRecordRead> {
   return request.post(`/containers/${id}/stuffing`, data);
 }

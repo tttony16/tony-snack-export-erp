@@ -267,6 +267,72 @@ class TestInventory:
         assert "is_ready" in resp.json()["data"]
 
 
+class TestInventoryBatches:
+    async def test_batch_list(
+        self, client: AsyncClient, admin_user: User, seed_confirmed_po: dict
+    ):
+        """Batch listing endpoint returns inventory records."""
+        headers = get_auth_headers(admin_user)
+        # Create inventory via receiving
+        data = make_receiving_note_data(
+            seed_confirmed_po["po_id"],
+            seed_confirmed_po["po_item_id"],
+            seed_confirmed_po["product_id"],
+        )
+        await client.post("/api/v1/warehouse/receiving-notes", json=data, headers=headers)
+
+        resp = await client.get("/api/v1/warehouse/inventory/batches", headers=headers)
+        assert resp.status_code == 200
+        batches = resp.json()["data"]
+        assert len(batches) > 0
+        # Verify batch fields
+        batch = batches[0]
+        assert "id" in batch
+        assert "product_id" in batch
+        assert "batch_no" in batch
+        assert "production_date" in batch
+        assert "available_quantity" in batch
+        assert "reserved_quantity" in batch
+
+    async def test_batch_list_filter_by_product(
+        self, client: AsyncClient, admin_user: User, seed_confirmed_po: dict
+    ):
+        headers = get_auth_headers(admin_user)
+        data = make_receiving_note_data(
+            seed_confirmed_po["po_id"],
+            seed_confirmed_po["po_item_id"],
+            seed_confirmed_po["product_id"],
+        )
+        await client.post("/api/v1/warehouse/receiving-notes", json=data, headers=headers)
+
+        resp = await client.get(
+            f"/api/v1/warehouse/inventory/batches?product_id={seed_confirmed_po['product_id']}",
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        batches = resp.json()["data"]
+        assert all(b["product_id"] == seed_confirmed_po["product_id"] for b in batches)
+
+    async def test_inventory_by_product_has_reserved(
+        self, client: AsyncClient, admin_user: User, seed_confirmed_po: dict
+    ):
+        """Inventory by product should include reserved_quantity."""
+        headers = get_auth_headers(admin_user)
+        data = make_receiving_note_data(
+            seed_confirmed_po["po_id"],
+            seed_confirmed_po["po_item_id"],
+            seed_confirmed_po["product_id"],
+        )
+        await client.post("/api/v1/warehouse/receiving-notes", json=data, headers=headers)
+
+        resp = await client.get("/api/v1/warehouse/inventory", headers=headers)
+        assert resp.status_code == 200
+        items = resp.json()["data"]["items"]
+        assert len(items) > 0
+        # Check reserved_quantity field exists
+        assert "reserved_quantity" in items[0]
+
+
 class TestPendingInspection:
     async def test_pending_inspection_empty(
         self, client: AsyncClient, admin_user: User

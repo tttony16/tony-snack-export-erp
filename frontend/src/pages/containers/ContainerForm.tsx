@@ -18,7 +18,11 @@ export default function ContainerForm({ open, onClose, onSuccess }: Props) {
       modalProps={{ onCancel: onClose, destroyOnClose: true }}
       width={600}
       onFinish={async (values: Record<string, unknown>) => {
-        await createContainerPlan(values as never);
+        const data = { ...values };
+        if (!data.sales_order_ids || (data.sales_order_ids as string[]).length === 0) {
+          data.sales_order_ids = [];
+        }
+        await createContainerPlan(data as never);
         message.success('创建成功');
         onSuccess();
         return true;
@@ -28,7 +32,7 @@ export default function ContainerForm({ open, onClose, onSuccess }: Props) {
         name="sales_order_ids"
         label="关联销售单"
         mode="multiple"
-        rules={[{ required: true }]}
+        tooltip="可选。不选时需手动指定目的港"
         showSearch
         request={async ({ keyWords }) => {
           const data = await listSalesOrders({ keyword: keyWords, page_size: 50 });
@@ -42,7 +46,7 @@ export default function ContainerForm({ open, onClose, onSuccess }: Props) {
         rules={[{ required: true }]}
       />
       <ProFormDigit name="container_count" label="柜数" min={1} initialValue={1} rules={[{ required: true }]} />
-      <ProFormText name="destination_port" label="目的港" />
+      <ProFormText name="destination_port" label="目的港" tooltip="关联销售单时自动带入" />
       <ProFormTextArea name="remark" label="备注" />
     </ModalForm>
   );

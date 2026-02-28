@@ -55,6 +55,7 @@ _ENUM_DEFS = [
     ("unit_type", ["piece", "carton"]),
     ("inspection_result", ["passed", "failed", "partial_passed"]),
     ("container_plan_status", ["planning", "confirmed", "loading", "loaded", "shipped"]),
+    ("outbound_order_status", ["draft", "confirmed", "cancelled"]),
     ("container_type", ["20GP", "40GP", "40HQ", "reefer"]),
     (
         "logistics_status",

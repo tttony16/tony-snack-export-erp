@@ -107,8 +107,8 @@ test.describe('Purchase Orders Module', () => {
     await selectSearchOption(adminPage, '供应商', supplierName.slice(0, 6), supplierName);
     await fillDatePicker(adminPage, '订单日期', new Date().toISOString().split('T')[0]);
 
-    // Verify the form rendered correctly
-    await expect(adminPage.getByText('添加一行数据').first()).toBeVisible();
+    // Verify the form rendered correctly with batch add button
+    await expect(adminPage.getByRole('button', { name: '添加商品' })).toBeVisible();
 
     // Submit the form - the backend may or may not require items
     await adminPage.getByRole('button', { name: '确 定' }).click();

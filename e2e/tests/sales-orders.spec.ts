@@ -54,10 +54,9 @@ test.describe('Sales Orders Module', () => {
     await selectAntOption(adminPage, '币种', 'USD');
     await selectAntOption(adminPage, '付款方式', 'T/T');
 
-    // Verify the editable table section rendered
-    await expect(adminPage.getByText('订单明细').or(adminPage.getByText('销售明细')).first()).toBeVisible();
-    // Verify add row button is available
-    await expect(adminPage.getByText('添加一行数据').first()).toBeVisible();
+    // Verify the editable table section rendered with batch add button
+    await expect(adminPage.getByText('订单明细').first()).toBeVisible();
+    await expect(adminPage.getByRole('button', { name: '添加商品' })).toBeVisible();
 
     // Submit the form — backend may or may not require items
     await adminPage.getByRole('button', { name: '确 定' }).click();

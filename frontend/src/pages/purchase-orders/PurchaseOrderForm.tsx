@@ -1,15 +1,19 @@
+import { useRef, useState } from 'react';
 import {
   ModalForm,
   ProFormSelect,
   ProFormDatePicker,
   ProFormTextArea,
   EditableProTable,
+  type ProFormInstance,
 } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
-import { message } from 'antd';
+import { Button, message, Popover, Space } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { createPurchaseOrder, updatePurchaseOrder } from '@/api/purchaseOrders';
 import { listSuppliers } from '@/api/suppliers';
 import { listSalesOrders } from '@/api/salesOrders';
+import { listProducts } from '@/api/products';
 import { UnitTypeLabels } from '@/types/api';
 import type { PurchaseOrderRead, PurchaseOrderItemCreate } from '@/types/models';
 import EntitySelect from '@/components/EntitySelect';
@@ -25,20 +29,46 @@ type EditableItem = PurchaseOrderItemCreate & { id?: string };
 
 export default function PurchaseOrderForm({ open, onClose, onSuccess, record }: Props) {
   const isEdit = !!record;
+  const formRef = useRef<ProFormInstance>();
+  const [editableKeys, setEditableKeys] = useState<React.Key[]>(
+    () => record?.items?.map((i) => i.id) || [],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+
+  const handleBatchAdd = () => {
+    if (selectedProducts.length === 0) return;
+    const currentItems: EditableItem[] = formRef.current?.getFieldValue('items') || [];
+    const existingProductIds = new Set(currentItems.map((i) => i.product_id));
+    const newItems: EditableItem[] = selectedProducts
+      .filter((pid) => !existingProductIds.has(pid))
+      .map((pid) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        product_id: pid,
+        quantity: 1,
+        unit: 'carton' as const,
+        unit_price: 0,
+      }));
+    if (newItems.length === 0) {
+      message.info('所选商品已在明细中');
+      setSelectedProducts([]);
+      setPickerOpen(false);
+      return;
+    }
+    const allItems = [...currentItems, ...newItems];
+    formRef.current?.setFieldsValue({ items: allItems });
+    setEditableKeys(allItems.map((i) => i.id!));
+    setSelectedProducts([]);
+    setPickerOpen(false);
+  };
 
   const itemColumns: ProColumns<EditableItem>[] = [
     {
       title: '商品',
       dataIndex: 'product_id',
+      width: 220,
       renderFormItem: () => (
-        <EntitySelect
-          fetchFn={async (params) => {
-            const { default: request } = await import('@/utils/request');
-            return request.get('/products', { params });
-          }}
-          labelField="name_cn"
-          placeholder="搜索商品"
-        />
+        <EntitySelect fetchFn={listProducts} labelField="name_cn" placeholder="搜索商品" />
       ),
     },
     { title: '数量', dataIndex: 'quantity', valueType: 'digit', width: 100 },
@@ -63,6 +93,7 @@ export default function PurchaseOrderForm({ open, onClose, onSuccess, record }: 
     <ModalForm
       title={isEdit ? '编辑采购订单' : '新建采购订单'}
       open={open}
+      formRef={formRef}
       modalProps={{ onCancel: onClose, destroyOnClose: true }}
       initialValues={
         isEdit
@@ -126,23 +157,45 @@ export default function PurchaseOrderForm({ open, onClose, onSuccess, record }: 
 
       <EditableProTable<EditableItem>
         name="items"
-        headerTitle="采购明细"
+        headerTitle={
+          <Space>
+            采购明细
+            <Popover
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              trigger="click"
+              placement="bottomLeft"
+              content={
+                <div style={{ width: 320 }}>
+                  <EntitySelect
+                    mode="multiple"
+                    fetchFn={listProducts}
+                    labelField="name_cn"
+                    placeholder="搜索并选择商品"
+                    value={selectedProducts}
+                    onChange={(val) => setSelectedProducts(val as string[])}
+                    style={{ width: '100%', marginBottom: 8 }}
+                  />
+                  <Button type="primary" block onClick={handleBatchAdd}>
+                    添加到明细
+                  </Button>
+                </div>
+              }
+            >
+              <Button type="primary" size="small" icon={<PlusOutlined />}>
+                添加商品
+              </Button>
+            </Popover>
+          </Space>
+        }
         columns={itemColumns}
         rowKey="id"
-        recordCreatorProps={{
-          newRecordType: 'dataSource',
-          record: () => ({
-            id: String(Date.now()),
-            product_id: '',
-            quantity: 1,
-            unit: 'carton' as const,
-            unit_price: 0,
-          }),
-        }}
+        recordCreatorProps={false}
         editable={{
           type: 'multiple',
-          editableKeys: [],
-          actionRender: (_row, _config, defaultDom) => [defaultDom.save, defaultDom.delete],
+          editableKeys,
+          onChange: setEditableKeys,
+          actionRender: (_row, _config, defaultDom) => [defaultDom.delete],
         }}
       />
     </ModalForm>

@@ -46,6 +46,9 @@ export default function EntitySelect({
       onSearch={search}
       loading={loading}
       options={options}
+      popupMatchSelectWidth={false}
+      style={{ width: '100%', ...props.style }}
+      dropdownStyle={{ minWidth: 260 }}
       {...props}
     />
   );

@@ -60,7 +60,7 @@ export default function SalesOrdersPage() {
       title: '采购进度',
       hideInSearch: true,
       width: 100,
-      render: (_, r: any) =>
+      render: (_, r) =>
         r.purchase_progress != null
           ? <Progress percent={Math.round(r.purchase_progress * 100)} size="small" />
           : '-',
@@ -69,7 +69,7 @@ export default function SalesOrdersPage() {
       title: '到货进度',
       hideInSearch: true,
       width: 100,
-      render: (_, r: any) =>
+      render: (_, r) =>
         r.arrival_progress != null
           ? <Progress percent={Math.round(r.arrival_progress * 100)} size="small" />
           : '-',

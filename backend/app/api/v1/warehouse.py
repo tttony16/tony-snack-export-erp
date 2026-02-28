@@ -16,6 +16,7 @@ from app.schemas.warehouse import (
     InventoryListParams,
     ReadinessCheckResponse,
     ReceivingNoteCreate,
+    ReceivingNoteItemRead,
     ReceivingNoteListParams,
     ReceivingNoteListRead,
     ReceivingNoteRead,
@@ -120,6 +121,27 @@ async def get_inventory(
     )
     service = WarehouseService(db)
     data = await service.get_inventory_by_product(params)
+    return PaginatedResponse(data=data)
+
+
+@router.get(
+    "/inventory/pending-inspection",
+    response_model=PaginatedResponse[ReceivingNoteItemRead],
+)
+async def list_pending_inspection(
+    keyword: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user: User = Depends(require_permission(Permission.INVENTORY_VIEW)),
+    db: AsyncSession = Depends(get_db),
+):
+    params = InventoryListParams(
+        keyword=keyword,
+        page=page,
+        page_size=page_size,
+    )
+    service = WarehouseService(db)
+    data = await service.list_pending_inspection(params)
     return PaginatedResponse(data=data)
 
 

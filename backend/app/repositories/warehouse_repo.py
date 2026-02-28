@@ -163,3 +163,32 @@ class InventoryRepository(BaseRepository[InventoryRecord]):
         return await self.get_list(
             offset=offset, limit=limit, order_by=order_by, order_desc=order_desc, filters=filters
         )
+
+
+class ReceivingNoteItemRepository(BaseRepository[ReceivingNoteItem]):
+    def __init__(self, db: AsyncSession):
+        super().__init__(ReceivingNoteItem, db)
+
+    async def search_pending_inspection(
+        self,
+        *,
+        keyword: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        order_by: str = "id",
+        order_desc: bool = True,
+    ) -> tuple[list[ReceivingNoteItem], int]:
+        from app.models.enums import InspectionResult
+
+        filters = [
+            ReceivingNoteItem.inspection_result != InspectionResult.PASSED,
+        ]
+        if keyword:
+            filters.append(
+                or_(
+                    ReceivingNoteItem.batch_no.ilike(f"%{keyword}%"),
+                )
+            )
+        return await self.get_list(
+            offset=offset, limit=limit, order_by=order_by, order_desc=order_desc, filters=filters
+        )

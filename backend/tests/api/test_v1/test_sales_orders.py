@@ -102,6 +102,27 @@ class TestListSalesOrders:
         assert resp.status_code == 200
         assert resp.json()["data"]["total"] >= 1
 
+    async def test_list_includes_progress_fields(
+        self, client: AsyncClient, admin_user: User, seed_customer: str, seed_product: str
+    ):
+        """List endpoint should include purchase_progress and arrival_progress."""
+        headers = get_auth_headers(admin_user)
+        await client.post(
+            "/api/v1/sales-orders",
+            json=make_sales_order_data(seed_customer, seed_product),
+            headers=headers,
+        )
+        resp = await client.get("/api/v1/sales-orders", headers=headers)
+        assert resp.status_code == 200
+        items = resp.json()["data"]["items"]
+        assert len(items) >= 1
+        item = items[0]
+        # Draft order: no purchases yet, progress should be 0
+        assert "purchase_progress" in item
+        assert "arrival_progress" in item
+        assert item["purchase_progress"] == 0.0
+        assert item["arrival_progress"] == 0.0
+
     async def test_list_filter_by_status(
         self, client: AsyncClient, admin_user: User, seed_customer: str, seed_product: str
     ):

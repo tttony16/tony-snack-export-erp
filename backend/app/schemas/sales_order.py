@@ -108,6 +108,8 @@ class SalesOrderListRead(BaseModel):
     status: SalesOrderStatus
     total_amount: Decimal
     total_quantity: int
+    purchase_progress: float | None = None
+    arrival_progress: float | None = None
     remark: str | None = None
     created_at: datetime
     updated_at: datetime

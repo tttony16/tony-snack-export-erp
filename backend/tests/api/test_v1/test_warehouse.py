@@ -265,3 +265,70 @@ class TestInventory:
         )
         assert resp.status_code == 200
         assert "is_ready" in resp.json()["data"]
+
+
+class TestPendingInspection:
+    async def test_pending_inspection_empty(
+        self, client: AsyncClient, admin_user: User
+    ):
+        """Pending inspection list returns successfully even with no data."""
+        headers = get_auth_headers(admin_user)
+        resp = await client.get("/api/v1/warehouse/inventory/pending-inspection", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["total"] >= 0
+
+    async def test_pending_inspection_with_partial_passed(
+        self, client: AsyncClient, admin_user: User, seed_confirmed_po: dict
+    ):
+        """Items with partial_passed inspection should appear in pending list."""
+        headers = get_auth_headers(admin_user)
+        data = make_receiving_note_data(
+            seed_confirmed_po["po_id"],
+            seed_confirmed_po["po_item_id"],
+            seed_confirmed_po["product_id"],
+            items=[
+                {
+                    "purchase_order_item_id": seed_confirmed_po["po_item_id"],
+                    "product_id": seed_confirmed_po["product_id"],
+                    "expected_quantity": 100,
+                    "actual_quantity": 80,
+                    "inspection_result": InspectionResult.PARTIAL_PASSED.value,
+                    "failed_quantity": 20,
+                    "failure_reason": "包装破损",
+                    "production_date": date.today().isoformat(),
+                }
+            ],
+        )
+        await client.post("/api/v1/warehouse/receiving-notes", json=data, headers=headers)
+
+        resp = await client.get("/api/v1/warehouse/inventory/pending-inspection", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["total"] >= 1
+        items = resp.json()["data"]["items"]
+        assert any(i["inspection_result"] == "partial_passed" for i in items)
+
+    async def test_pending_inspection_excludes_passed(
+        self, client: AsyncClient, admin_user: User, seed_confirmed_po: dict
+    ):
+        """Items with passed inspection should NOT appear in pending list."""
+        headers = get_auth_headers(admin_user)
+        data = make_receiving_note_data(
+            seed_confirmed_po["po_id"],
+            seed_confirmed_po["po_item_id"],
+            seed_confirmed_po["product_id"],
+        )
+        await client.post("/api/v1/warehouse/receiving-notes", json=data, headers=headers)
+
+        resp = await client.get("/api/v1/warehouse/inventory/pending-inspection", headers=headers)
+        assert resp.status_code == 200
+        items = resp.json()["data"]["items"]
+        # None should be "passed"
+        assert all(i["inspection_result"] != "passed" for i in items)
+
+    async def test_pending_inspection_viewer_allowed(
+        self, client: AsyncClient, viewer_user: User
+    ):
+        """Viewer should have access to pending inspection (INVENTORY_VIEW permission)."""
+        headers = get_auth_headers(viewer_user)
+        resp = await client.get("/api/v1/warehouse/inventory/pending-inspection", headers=headers)
+        assert resp.status_code == 200

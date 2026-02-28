@@ -368,6 +368,8 @@ export interface SalesOrderListRead {
   status: SalesOrderStatus;
   total_amount: number;
   total_quantity: number;
+  purchase_progress: number | null;
+  arrival_progress: number | null;
   remark: string | null;
   created_at: string;
   updated_at: string;

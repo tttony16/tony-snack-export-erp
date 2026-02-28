@@ -162,9 +162,20 @@ class SalesOrderService:
             limit=params.page_size,
             order_by=params.sort_by,
             order_desc=params.sort_order == "desc",
+            load_items=True,
         )
+        result_items = []
+        for order in items:
+            item_data = SalesOrderListRead.model_validate(order)
+            total_qty = sum(i.quantity for i in order.items) if order.items else 0
+            if total_qty > 0:
+                purchased_qty = sum(i.purchased_quantity for i in order.items)
+                received_qty = sum(i.received_quantity for i in order.items)
+                item_data.purchase_progress = round(purchased_qty / total_qty, 4)
+                item_data.arrival_progress = round(received_qty / total_qty, 4)
+            result_items.append(item_data)
         return PaginatedData(
-            items=[SalesOrderListRead.model_validate(item) for item in items],
+            items=result_items,
             total=total,
             page=params.page,
             page_size=params.page_size,

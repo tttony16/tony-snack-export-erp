@@ -39,6 +39,7 @@ class SalesOrderRepository(BaseRepository[SalesOrder]):
         limit: int = 20,
         order_by: str = "created_at",
         order_desc: bool = True,
+        load_items: bool = False,
     ) -> tuple[list[SalesOrder], int]:
         filters = []
         if keyword:
@@ -57,6 +58,15 @@ class SalesOrderRepository(BaseRepository[SalesOrder]):
         if date_to:
             filters.append(SalesOrder.order_date <= date_to)
 
+        if load_items:
+            return await self._get_list_with_items(
+                offset=offset,
+                limit=limit,
+                order_by=order_by,
+                order_desc=order_desc,
+                filters=filters,
+            )
+
         return await self.get_list(
             offset=offset,
             limit=limit,
@@ -64,6 +74,37 @@ class SalesOrderRepository(BaseRepository[SalesOrder]):
             order_desc=order_desc,
             filters=filters,
         )
+
+    async def _get_list_with_items(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+        order_by: str = "created_at",
+        order_desc: bool = True,
+        filters: list | None = None,
+    ) -> tuple[list[SalesOrder], int]:
+        query = select(SalesOrder).options(selectinload(SalesOrder.items))
+        count_query = select(func.count()).select_from(SalesOrder)
+
+        if filters:
+            for f in filters:
+                query = query.where(f)
+                count_query = count_query.where(f)
+
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar_one()
+
+        order_col = getattr(SalesOrder, order_by, SalesOrder.created_at)
+        if order_desc:
+            query = query.order_by(order_col.desc())
+        else:
+            query = query.order_by(order_col.asc())
+
+        query = query.offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        items = list(result.scalars().unique().all())
+        return items, total
 
     async def get_kanban_stats(self) -> list[dict]:
         result = await self.db.execute(

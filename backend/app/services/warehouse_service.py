@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import BusinessError, NotFoundError
 from app.models.enums import PurchaseOrderStatus, SalesOrderStatus
 from app.models.warehouse import InventoryRecord, ReceivingNote, ReceivingNoteItem
-from app.repositories.warehouse_repo import InventoryRepository, ReceivingNoteRepository
+from app.repositories.warehouse_repo import (
+    InventoryRepository,
+    ReceivingNoteItemRepository,
+    ReceivingNoteRepository,
+)
 from app.schemas.common import PaginatedData
 from app.schemas.warehouse import (
     InventoryByOrderRead,
@@ -14,6 +18,7 @@ from app.schemas.warehouse import (
     InventoryListParams,
     ReadinessCheckResponse,
     ReceivingNoteCreate,
+    ReceivingNoteItemRead,
     ReceivingNoteListParams,
     ReceivingNoteListRead,
     ReceivingNoteUpdate,
@@ -26,6 +31,7 @@ class WarehouseService:
         self.db = db
         self.note_repo = ReceivingNoteRepository(db)
         self.inventory_repo = InventoryRepository(db)
+        self.note_item_repo = ReceivingNoteItemRepository(db)
 
     # ==================== Receiving Notes ====================
 
@@ -197,6 +203,23 @@ class WarehouseService:
             sales_order_id=sales_order_id,
             is_ready=all_ready,
             items=item_statuses,
+        )
+
+    async def list_pending_inspection(
+        self, params: InventoryListParams
+    ) -> PaginatedData[ReceivingNoteItemRead]:
+        offset = (params.page - 1) * params.page_size
+        items, total = await self.note_item_repo.search_pending_inspection(
+            keyword=params.keyword,
+            offset=offset,
+            limit=params.page_size,
+        )
+        return PaginatedData(
+            items=[ReceivingNoteItemRead.model_validate(item) for item in items],
+            total=total,
+            page=params.page,
+            page_size=params.page_size,
+            total_pages=math.ceil(total / params.page_size) if total > 0 else 0,
         )
 
     # ==================== Internal Helpers ====================
